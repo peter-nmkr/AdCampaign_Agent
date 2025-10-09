@@ -253,7 +253,6 @@ class CampaignState(TypedDict):
     brand_identity: Optional[str]
     logo_base64: Optional[str]
     company_profile: str
-    campaign_plan: str
     graphic_concepts: Optional[GraphicConceptsOutput]
     generated_images: List[Dict]
 
@@ -314,88 +313,88 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
             if logo_base64:
                 vision_prompt = """Analyze the provided website screenshot AND logo file to extract comprehensive brand identity (CI) information.
 
-Compare both images to understand the complete brand identity.
+                    Compare both images to understand the complete brand identity.
 
-Provide a detailed analysis including:
+                    Provide a detailed analysis including:
 
-1. **Color Palette**:
-   - Primary colors (with hex codes if identifiable from both website and logo)
-   - Secondary colors
-   - Accent colors
-   - Background/neutral colors
-   - How the logo colors are used throughout the website
+                    1. **Color Palette**:
+                       - Primary colors (with hex codes if identifiable from both website and logo)
+                       - Secondary colors
+                       - Accent colors
+                       - Background/neutral colors
+                       - How the logo colors are used throughout the website
 
-2. **Typography & Text Style**:
-   - Font style (modern, classic, playful, professional, etc.)
-   - Text hierarchy and sizing
-   - Typography personality
-   - Any text in the logo and its style
+                    2. **Typography & Text Style**:
+                       - Font style (modern, classic, playful, professional, etc.)
+                       - Text hierarchy and sizing
+                       - Typography personality
+                       - Any text in the logo and its style
 
-3. **Logo & Branding Elements**:
-   - Detailed logo analysis (style, shapes, symbolism)
-   - Logo characteristics (minimalist, detailed, icon-based, wordmark, combination mark, etc.)
-   - How the logo is integrated into the website design
-   - Brand symbols or icons derived from the logo
+                    3. **Logo & Branding Elements**:
+                       - Detailed logo analysis (style, shapes, symbolism)
+                       - Logo characteristics (minimalist, detailed, icon-based, wordmark, combination mark, etc.)
+                       - How the logo is integrated into the website design
+                       - Brand symbols or icons derived from the logo
 
-4. **Visual Design Style**:
-   - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
-   - Layout patterns (grid-based, asymmetric, centered, etc.)
-   - Use of whitespace
-   - Image style (photography, illustrations, abstract, etc.)
-   - How design elements echo the logo
+                    4. **Visual Design Style**:
+                       - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
+                       - Layout patterns (grid-based, asymmetric, centered, etc.)
+                       - Use of whitespace
+                       - Image style (photography, illustrations, abstract, etc.)
+                       - How design elements echo the logo
 
-5. **Brand Tone & Personality**:
-   - Professional, casual, friendly, authoritative, innovative, traditional, etc.
-   - Emotional tone conveyed by design
-   - Target audience implied by design choices
-   - Brand personality expressed through logo and website
+                    5. **Brand Tone & Personality**:
+                       - Professional, casual, friendly, authoritative, innovative, traditional, etc.
+                       - Emotional tone conveyed by design
+                       - Target audience implied by design choices
+                       - Brand personality expressed through logo and website
 
-6. **UI/UX Patterns**:
-   - Button styles
-   - Call-to-action prominence
-   - Navigation style
-   - Visual hierarchy
+                    6. **UI/UX Patterns**:
+                       - Button styles
+                       - Call-to-action prominence
+                       - Navigation style
+                       - Visual hierarchy
 
-Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+                    Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
             else:
                 vision_prompt = """Analyze this website screenshot and extract comprehensive brand identity (CI) information.
 
-Provide a detailed analysis including:
-
-1. **Color Palette**:
-   - Primary colors (with hex codes if identifiable)
-   - Secondary colors
-   - Accent colors
-   - Background/neutral colors
-
-2. **Typography & Text Style**:
-   - Font style (modern, classic, playful, professional, etc.)
-   - Text hierarchy and sizing
-   - Typography personality
-
-3. **Logo & Branding Elements**:
-   - Logo placement and style
-   - Logo characteristics (minimalist, detailed, icon-based, wordmark, etc.)
-   - Brand symbols or icons
-
-4. **Visual Design Style**:
-   - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
-   - Layout patterns (grid-based, asymmetric, centered, etc.)
-   - Use of whitespace
-   - Image style (photography, illustrations, abstract, etc.)
-
-5. **Brand Tone & Personality**:
-   - Professional, casual, friendly, authoritative, innovative, traditional, etc.
-   - Emotional tone conveyed by design
-   - Target audience implied by design choices
-
-6. **UI/UX Patterns**:
-   - Button styles
-   - Call-to-action prominence
-   - Navigation style
-   - Visual hierarchy
-
-Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+                    Provide a detailed analysis including:
+                    
+                    1. **Color Palette**:
+                       - Primary colors (with hex codes if identifiable)
+                       - Secondary colors
+                       - Accent colors
+                       - Background/neutral colors
+                    
+                    2. **Typography & Text Style**:
+                       - Font style (modern, classic, playful, professional, etc.)
+                       - Text hierarchy and sizing
+                       - Typography personality
+                    
+                    3. **Logo & Branding Elements**:
+                       - Logo placement and style
+                       - Logo characteristics (minimalist, detailed, icon-based, wordmark, etc.)
+                       - Brand symbols or icons
+                    
+                    4. **Visual Design Style**:
+                       - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
+                       - Layout patterns (grid-based, asymmetric, centered, etc.)
+                       - Use of whitespace
+                       - Image style (photography, illustrations, abstract, etc.)
+                    
+                    5. **Brand Tone & Personality**:
+                       - Professional, casual, friendly, authoritative, innovative, traditional, etc.
+                       - Emotional tone conveyed by design
+                       - Target audience implied by design choices
+                    
+                    6. **UI/UX Patterns**:
+                       - Button styles
+                       - Call-to-action prominence
+                       - Navigation style
+                       - Visual hierarchy
+                    
+                    Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
 
             # Build content array for vision API
             content = [{"type": "text", "text": vision_prompt}]
@@ -493,67 +492,24 @@ async def generate_company_profile_node(state: CampaignState) -> CampaignState:
     }
 
 
-# Node 2: Generate Campaign Plan
-async def generate_campaign_plan_node(state: CampaignState) -> CampaignState:
-    tracer = state["tracer"]
-
-    await tracer.markdown("# Step 3: Creating Campaign Strategy")
-    await tracer.markdown("Developing campaign plan based on company profile...")
-
-    prompt = f"""Based on this company profile, create a comprehensive digital advertising campaign plan for static image ads:
-
-COMPANY PROFILE:
-{state['company_profile']}
-
-CAMPAIGN REQUIREMENTS:
-- Language: {state['language']}
-- Focus on static images only (no videos)
-- Should work across Google Ads, Meta Ads, and email marketing
-
-Create a detailed campaign plan including:
-1. Creative campaign name
-2. Primary objective and KPIs
-3. Core campaign message and key messaging pillars (3-4)
-4. Visual theme and aesthetic direction suitable for static images
-5. Color palette (describe 3-5 colors descriptively)
-6. Recommended ad formats (social posts, banners, stories, etc.)
-7. Audience segments and targeting strategy
-8. Content strategy and posting/distribution plan
-9. A/B testing recommendations
-
-Format your response with clear sections and be specific about visual execution for static images."""
-
-    response = await llm.ainvoke(prompt)
-    campaign_plan = response.content
-
-    await tracer.markdown("## Campaign Plan Developed")
-    await tracer.markdown(campaign_plan)
-
-    return {
-        **state,
-        "campaign_plan": campaign_plan,
-        "tracer": tracer
-    }
+# (Removed) Generate Campaign Plan node
 
 
 # Node 3: Generate Graphic Concepts (with structured output)
 async def generate_graphic_concepts_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
 
-    await tracer.markdown("# Step 4: Generating Graphics Overview")
+    await tracer.markdown("# Step 3: Generating Graphics Overview")
     await tracer.markdown("Creating detailed specifications for all campaign graphics...")
 
     # Check if logo is available
     has_logo = state.get('logo_base64') is not None
     logo_instruction = "- A company logo is available and can be incorporated into designs where appropriate. Mention logo placement in descriptions where it makes sense (e.g., 'company logo in top-right corner')." if has_logo else "- No logo available, do not mention logos in descriptions."
 
-    prompt = f"""Based on this company profile and campaign plan, give an overview of all graphics that will make up the final campaign.
+    prompt = f"""Based on this company profile, give an overview of all graphics that will make up the final campaign.
 
 COMPANY PROFILE:
 {state['company_profile']}
-
-CAMPAIGN PLAN:
-{state['campaign_plan']}
 
 REQUIREMENTS:
 - Language for all copy: {state['language']}
@@ -718,7 +674,7 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
     concepts = state["graphic_concepts"].concepts
 
-    await tracer.markdown("# Step 5: Generating Images with Gemini 2.5 Flash")
+    await tracer.markdown("# Step 4: Generating Images with Gemini 2.5 Flash")
     await tracer.markdown(f"Creating {len(concepts)} graphics in parallel...")
 
     # Get logo from state
@@ -788,14 +744,12 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
 workflow = StateGraph(CampaignState)
 workflow.add_node("capture_and_extract_brand", capture_and_extract_brand_node)
 workflow.add_node("company_profile", generate_company_profile_node)
-workflow.add_node("campaign_plan", generate_campaign_plan_node)
 workflow.add_node("graphic_concepts", generate_graphic_concepts_node)
 workflow.add_node("generate_images", generate_images_parallel_node)
 
 workflow.add_edge(START, "capture_and_extract_brand")
 workflow.add_edge("capture_and_extract_brand", "company_profile")
-workflow.add_edge("company_profile", "campaign_plan")
-workflow.add_edge("campaign_plan", "graphic_concepts")
+workflow.add_edge("company_profile", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
 workflow.add_edge("generate_images", END)
 
@@ -839,7 +793,6 @@ async def runner(inputs: dict, tracer: Tracer):
         "brand_identity": None,
         "logo_base64": None,
         "company_profile": "",
-        "campaign_plan": "",
         "graphic_concepts": None,
         "generated_images": [],
         "tracer": tracer
@@ -860,12 +813,7 @@ async def runner(inputs: dict, tracer: Tracer):
     html.append(f"<div style='line-height: 1.6;'>{profile_html}</div>")
     html.append("</div>")
 
-    # Campaign Plan Section
-    html.append("<div style='background: #f0f9ff; padding: 30px; border-radius: 12px; margin: 30px 0; border-left: 5px solid #0284c7;'>")
-    html.append("<h2 style='color: #0c4a6e;'>📋 Campaign Strategy</h2>")
-    plan_html = result['campaign_plan'].replace('\n', '<br>')
-    html.append(f"<div style='color: #0c4a6e; line-height: 1.6;'>{plan_html}</div>")
-    html.append("</div>")
+    # (Removed) Campaign Plan Section
 
     # Graphics Overview
     html.append("<div style='background: #fefce8; padding: 30px; border-radius: 12px; margin: 30px 0; border-left: 5px solid #eab308;'>")

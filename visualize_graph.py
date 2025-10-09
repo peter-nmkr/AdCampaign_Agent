@@ -22,7 +22,6 @@ class CampaignState(TypedDict):
     channels: Optional[str]
     budget: Optional[str]
     company_profile: str
-    campaign_plan: str
     graphic_concepts: Optional[object]
     generated_images: List[Dict]
     tracer: object
@@ -32,14 +31,12 @@ workflow = StateGraph(CampaignState)
 
 # Add nodes
 workflow.add_node("company_profile", lambda x: x)
-workflow.add_node("campaign_plan", lambda x: x)
 workflow.add_node("graphic_concepts", lambda x: x)
 workflow.add_node("generate_images", lambda x: x)
 
 # Add edges
 workflow.add_edge(START, "company_profile")
-workflow.add_edge("company_profile", "campaign_plan")
-workflow.add_edge("campaign_plan", "graphic_concepts")
+workflow.add_edge("company_profile", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
 workflow.add_edge("generate_images", END)
 
@@ -87,20 +84,8 @@ try:
                │
                ▼
     ┌─────────────────────┐
-    │  campaign_plan      │
-    │  (Node 2)           │
-    │                     │
-    │ - Takes profile     │
-    │ - Generates         │
-    │   strategy          │
-    │ - Visual theme      │
-    │ - Messaging         │
-    └──────────┬──────────┘
-               │
-               ▼
-    ┌─────────────────────┐
     │  graphic_concepts   │
-    │  (Node 3)           │
+    │  (Node 2)           │
     │                     │
     │ - Structured output │
     │ - 10+ graphics      │
@@ -111,7 +96,7 @@ try:
                ▼
     ┌─────────────────────┐
     │  generate_images    │
-    │  (Node 4)           │
+    │  (Node 3)           │
     │                     │
     │ - Ray parallel      │
     │ - Gemini 2.0 Flash  │

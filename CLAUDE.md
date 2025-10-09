@@ -39,12 +39,12 @@ GOOGLE_API_KEY=your_google_key
 
 ## Architecture
 
-### LangGraph Workflow (4 Sequential Nodes)
+### LangGraph Workflow (3 Sequential Nodes)
 
-The application uses a **linear state machine** defined in `app.py:543-556`:
+The application uses a **linear state machine** defined in `app.py`:
 
 ```
-START → company_profile → campaign_plan → graphic_concepts → generate_images → END
+START → company_profile → graphic_concepts → generate_images → END
 ```
 
 **State Type:** `CampaignState` (TypedDict) carries all data through the workflow, including a `tracer` object for streaming UI updates.
@@ -54,16 +54,16 @@ START → company_profile → campaign_plan → graphic_concepts → generate_im
 - Calls GPT-4o to fill missing information with reasonable assumptions
 - Outputs: Comprehensive company profile with positioning, demographics, psychographics
 
-#### Node 2: `generate_campaign_plan_node` (app.py:284)
-- Takes company profile from Node 1
-- Generates strategic campaign plan including: campaign name, KPIs, messaging pillars, visual theme, color palette, ad formats, audience segments
-- All strategy is tailored for **static images only** (no video)
-
-#### Node 3: `generate_graphic_concepts_node` (app.py:327)
+#### Node 2: `generate_graphic_concepts_node`
 - Uses **structured output** with Pydantic models (`GraphicConceptsOutput`, `GraphicConcept`)
 - Generates 10+ graphic specifications with detailed AI image generation prompts
 - Each concept includes: graphic number, platform, resolution, headline/subtext/CTA (in user's language), detailed visual description (composition, colors, style, objects, mood)
-- Returns structured data, not free-form text
+
+#### Node 3: `generate_images_parallel_node`
+- **Ray parallel execution**: Spawns Ray remote tasks for each graphic concept
+- Each task calls `generate_image_gemini` using Gemini 2.0 Flash Image Preview
+- Implements retry logic (3 attempts with exponential backoff)
+- Streams progress updates using `ray.wait()` as images complete
 
 #### Node 4: `generate_images_parallel_node` (app.py:477)
 - **Ray parallel execution**: Spawns Ray remote tasks for each graphic concept
@@ -138,6 +138,5 @@ Update `llm` initialization (app.py:215) and ensure API key is in `.env`
 Add new `F.Input*` to `campaign_form_model` (app.py:75), update `CampaignState`, and access via `inputs.get("field_name")` in runner
 
 **Modifying prompts:**
-- Company profile: Edit `company_profile_template` (app.py:11)
-- Campaign plan: Edit prompt in Node 2 (app.py:290)
-- Graphic concepts: Edit prompt in Node 3 (app.py:333)
+- Company profile: Edit `company_profile_template` (app.py)
+- Graphic concepts: Edit prompt in `generate_graphic_concepts_node` (app.py)
