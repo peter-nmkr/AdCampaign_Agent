@@ -68,7 +68,19 @@ company_profile_template = Template("""
     Feedback loop: How learnings will shape future campaigns.
     MISSING
 
-    Provide a full overview of the combined information
+    {% if brand_identity %}
+    EXTRACTED BRAND IDENTITY (from website analysis):
+    {{brand_identity}}
+
+    IMPORTANT: Use this brand identity information to:
+    1. Ensure all campaign visuals match the existing color palette
+    2. Maintain consistency with the established typography and design style
+    3. Align campaign tone with the brand personality
+    4. Incorporate visual patterns and UI/UX elements that match the brand
+    5. Make assumptions about positioning and target audience based on the visual brand analysis
+    {% endif %}
+
+    Provide a full overview of the combined information, integrating the brand identity analysis into your assumptions and recommendations.
 """)
 
 # Campaign form with company profile inputs
@@ -237,6 +249,9 @@ class CampaignState(TypedDict):
     budget: Optional[str]
 
     # Generated outputs
+    screenshot_base64: Optional[str]
+    brand_identity: Optional[str]
+    logo_base64: Optional[str]
     company_profile: str
     campaign_plan: str
     graphic_concepts: Optional[GraphicConceptsOutput]
@@ -245,14 +260,211 @@ class CampaignState(TypedDict):
     tracer: Tracer
 
 
-# Node 1: Generate Company Profile using template
+# Node 1: Capture Website Screenshot and Extract Brand Identity
+async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
+    tracer = state["tracer"]
+    website_url = state["website"]
+
+    await tracer.markdown("# Step 1: Analyzing Website and Extracting Brand Identity")
+    await tracer.markdown(f"Capturing screenshot from **{website_url}**...")
+
+    try:
+        # Import Playwright
+        from playwright.async_api import async_playwright
+
+        # Capture screenshot
+        async with async_playwright() as p:
+            browser = await p.chromium.launch()
+            page = await browser.new_page(viewport={"width": 1920, "height": 1080})
+
+            # Navigate to website with timeout
+            await page.goto(website_url, timeout=30000, wait_until="networkidle")
+
+            # Take full page screenshot
+            screenshot_bytes = await page.screenshot(full_page=True, type="png")
+            await browser.close()
+
+            # Convert to base64
+            screenshot_base64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+
+            await tracer.markdown("✅ Screenshot captured successfully!")
+
+            # Check for uploaded logo
+            fs = await tracer.fs()
+            input_files = await fs.ls("in")
+            logo_base64 = None
+
+            if input_files:
+                await tracer.markdown("📎 Logo file detected, including in brand analysis...")
+                # Read the first uploaded file (logo)
+                logo_path = input_files[0]["path"]
+                logo_bytes = await fs.read(logo_path)
+                logo_base64 = base64.b64encode(logo_bytes).decode('utf-8')
+
+            await tracer.markdown("🔍 Analyzing brand identity with GPT-4o Vision...")
+
+            # Extract brand identity using GPT-4o Vision
+            vision_llm = ChatOpenAI(
+                model="gpt-4o",
+                temperature=0.3,
+                api_key=os.getenv("OPENAI_API_KEY")
+            )
+
+            # Adjust prompt based on whether logo is available
+            if logo_base64:
+                vision_prompt = """Analyze the provided website screenshot AND logo file to extract comprehensive brand identity (CI) information.
+
+Compare both images to understand the complete brand identity.
+
+Provide a detailed analysis including:
+
+1. **Color Palette**:
+   - Primary colors (with hex codes if identifiable from both website and logo)
+   - Secondary colors
+   - Accent colors
+   - Background/neutral colors
+   - How the logo colors are used throughout the website
+
+2. **Typography & Text Style**:
+   - Font style (modern, classic, playful, professional, etc.)
+   - Text hierarchy and sizing
+   - Typography personality
+   - Any text in the logo and its style
+
+3. **Logo & Branding Elements**:
+   - Detailed logo analysis (style, shapes, symbolism)
+   - Logo characteristics (minimalist, detailed, icon-based, wordmark, combination mark, etc.)
+   - How the logo is integrated into the website design
+   - Brand symbols or icons derived from the logo
+
+4. **Visual Design Style**:
+   - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
+   - Layout patterns (grid-based, asymmetric, centered, etc.)
+   - Use of whitespace
+   - Image style (photography, illustrations, abstract, etc.)
+   - How design elements echo the logo
+
+5. **Brand Tone & Personality**:
+   - Professional, casual, friendly, authoritative, innovative, traditional, etc.
+   - Emotional tone conveyed by design
+   - Target audience implied by design choices
+   - Brand personality expressed through logo and website
+
+6. **UI/UX Patterns**:
+   - Button styles
+   - Call-to-action prominence
+   - Navigation style
+   - Visual hierarchy
+
+Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+            else:
+                vision_prompt = """Analyze this website screenshot and extract comprehensive brand identity (CI) information.
+
+Provide a detailed analysis including:
+
+1. **Color Palette**:
+   - Primary colors (with hex codes if identifiable)
+   - Secondary colors
+   - Accent colors
+   - Background/neutral colors
+
+2. **Typography & Text Style**:
+   - Font style (modern, classic, playful, professional, etc.)
+   - Text hierarchy and sizing
+   - Typography personality
+
+3. **Logo & Branding Elements**:
+   - Logo placement and style
+   - Logo characteristics (minimalist, detailed, icon-based, wordmark, etc.)
+   - Brand symbols or icons
+
+4. **Visual Design Style**:
+   - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
+   - Layout patterns (grid-based, asymmetric, centered, etc.)
+   - Use of whitespace
+   - Image style (photography, illustrations, abstract, etc.)
+
+5. **Brand Tone & Personality**:
+   - Professional, casual, friendly, authoritative, innovative, traditional, etc.
+   - Emotional tone conveyed by design
+   - Target audience implied by design choices
+
+6. **UI/UX Patterns**:
+   - Button styles
+   - Call-to-action prominence
+   - Navigation style
+   - Visual hierarchy
+
+Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+
+            # Build content array for vision API
+            content = [{"type": "text", "text": vision_prompt}]
+
+            # Add website screenshot
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/png;base64,{screenshot_base64}"
+                }
+            })
+
+            # Add logo if available
+            if logo_base64:
+                # Detect image format from file extension
+                logo_ext = Path(input_files[0]["path"]).suffix.lower()
+                logo_mime = "image/png" if logo_ext == ".png" else "image/jpeg"
+
+                content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{logo_mime};base64,{logo_base64}"
+                    }
+                })
+
+            response = await vision_llm.ainvoke([
+                {
+                    "role": "user",
+                    "content": content
+                }
+            ])
+
+            brand_identity = response.content
+
+            await tracer.markdown("✅ Brand identity extracted!")
+            await tracer.markdown("---")
+            await tracer.markdown("## Extracted Brand Identity")
+            await tracer.markdown(brand_identity)
+            await tracer.markdown("---")
+
+            return {
+                **state,
+                "screenshot_base64": screenshot_base64,
+                "brand_identity": brand_identity,
+                "logo_base64": logo_base64,
+                "tracer": tracer
+            }
+
+    except Exception as e:
+        await tracer.markdown(f"⚠️ Error capturing screenshot or extracting brand identity: {str(e)}")
+        await tracer.markdown("Continuing without brand identity extraction...")
+
+        return {
+            **state,
+            "screenshot_base64": None,
+            "brand_identity": None,
+            "logo_base64": None,
+            "tracer": tracer
+        }
+
+
+# Node 2: Generate Company Profile using template
 async def generate_company_profile_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
 
-    await tracer.markdown("# Step 1: Building Company Profile")
+    await tracer.markdown("# Step 2: Building Company Profile")
     await tracer.markdown(f"Analyzing **{state['name']}** in the {state['industry']} industry...")
 
-    # Render the template with form inputs
+    # Render the template with form inputs and brand identity
     prompt = company_profile_template.render(
         name=state['name'],
         address=state.get('address', 'Not provided'),
@@ -264,7 +476,8 @@ async def generate_company_profile_node(state: CampaignState) -> CampaignState:
         offer=state.get('offer', 'Not specified'),
         cta=state.get('cta', 'Not specified'),
         budget=state.get('budget', 'Not specified'),
-        channels=state.get('channels', 'Not specified')
+        channels=state.get('channels', 'Not specified'),
+        brand_identity=state.get('brand_identity', None)
     )
 
     response = await llm.ainvoke(prompt)
@@ -284,7 +497,7 @@ async def generate_company_profile_node(state: CampaignState) -> CampaignState:
 async def generate_campaign_plan_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
 
-    await tracer.markdown("# Step 2: Creating Campaign Strategy")
+    await tracer.markdown("# Step 3: Creating Campaign Strategy")
     await tracer.markdown("Developing campaign plan based on company profile...")
 
     prompt = f"""Based on this company profile, create a comprehensive digital advertising campaign plan for static image ads:
@@ -327,8 +540,12 @@ Format your response with clear sections and be specific about visual execution 
 async def generate_graphic_concepts_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
 
-    await tracer.markdown("# Step 3: Generating Graphics Overview")
+    await tracer.markdown("# Step 4: Generating Graphics Overview")
     await tracer.markdown("Creating detailed specifications for all campaign graphics...")
+
+    # Check if logo is available
+    has_logo = state.get('logo_base64') is not None
+    logo_instruction = "- A company logo is available and can be incorporated into designs where appropriate. Mention logo placement in descriptions where it makes sense (e.g., 'company logo in top-right corner')." if has_logo else "- No logo available, do not mention logos in descriptions."
 
     prompt = f"""Based on this company profile and campaign plan, give an overview of all graphics that will make up the final campaign.
 
@@ -341,12 +558,12 @@ CAMPAIGN PLAN:
 REQUIREMENTS:
 - Language for all copy: {state['language']}
 - Static images only (no videos, no real people, no real locations)
-- Logo will be added separately, don't mention it in image descriptions
+{logo_instruction}
 - Images should work for: Google Ads, Meta Ads, Email Marketing
 
 Give an overview of all graphics that will make up the final campaign. Format it as a structured list including the following information:
 - Graphic number
-- Detailed description of the graphic (be very specific about composition, colors, style, objects, mood, lighting, perspective - at least 4-5 sentences for AI image generation. Do NOT include text, logos, or people)
+- Detailed description of the graphic (be very specific about composition, colors, style, objects, mood - at least 4-5 sentences for AI image generation. Do NOT include people{', but MAY mention logo placement if appropriate' if has_logo else ''})
 - Target platform (e.g., Instagram Feed, Facebook Ad, Google Display Banner, Email Header)
 - Resolution (standard sizes: 1080x1080 for square, 1200x628 for Facebook, 1080x1920 for stories, 728x90 for banners, etc.)
 - Headline text (in {state['language']})
@@ -383,22 +600,31 @@ Also provide a brief campaign overview explaining the graphics strategy."""
 
 # Ray remote function for Gemini image generation
 @ray.remote
-def generate_image_gemini(concept: dict, concept_number: int) -> Dict:
-    """Generate an image using Gemini 2.5 Flash Image"""
+def generate_image_gemini(concept: dict, concept_number: int, logo_base64: Optional[str] = None) -> Dict:
+    """Generate an image using Gemini 2.5 Flash Image and overlay logo if provided"""
     from google import genai
     import datetime
     import os
     import time
+    import io
 
     try:
         t0 = datetime.datetime.now()
 
-        # Parse resolution
+        # Assemble prompt
         resolution = concept.get('resolution', '1080x1080')
         try:
             width, height = map(int, resolution.split('x'))
         except:
             width, height = 1080, 1080
+        headline = concept.get('copy_headline', '')
+        subtext = concept.get('copy_subtext', '')
+        cta = concept.get('call_to_action', '')
+        full_prompt = (
+            f"{concept['description']}; "
+            f"Headline: {headline}. Subtext: {subtext}. Call to Action: {cta}. "
+            f"{width}:{height} aspect ratio"
+        )
 
         # Initialize Gemini client
         client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
@@ -409,13 +635,27 @@ def generate_image_gemini(concept: dict, concept_number: int) -> Dict:
 
         for attempt in range(max_retries):
             try:
-                # Build prompt with aspect ratio
-                aspect_ratio = f"{width}:{height}"
-                full_prompt = f"{concept['description']}, high quality, professional photography, {aspect_ratio} aspect ratio"
+                # Check if description mentions logo and logo is available
+                description_lower = concept['description'].lower()
+                include_logo = logo_base64 and ('logo' in description_lower)
+
+                # Build contents for Gemini
+                if include_logo:
+                    # Include logo image as reference
+                    from google.genai import types
+                    contents = [
+                        types.Part.from_text(full_prompt),
+                        types.Part.from_bytes(
+                            data=base64.b64decode(logo_base64),
+                            mime_type="image/png"
+                        )
+                    ]
+                else:
+                    contents = [full_prompt]
 
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-image-preview",
-                    contents=[full_prompt],
+                    contents=contents,
                 )
 
                 if not response or not response.candidates:
@@ -478,8 +718,13 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
     concepts = state["graphic_concepts"].concepts
 
-    await tracer.markdown("# Step 4: Generating Images with Gemini 2.0 Flash")
+    await tracer.markdown("# Step 5: Generating Images with Gemini 2.5 Flash")
     await tracer.markdown(f"Creating {len(concepts)} graphics in parallel...")
+
+    # Get logo from state
+    logo_base64 = state.get('logo_base64')
+    if logo_base64:
+        await tracer.markdown("🎨 Logo will be incorporated into graphics where mentioned in descriptions")
 
     # Convert concepts to dicts for Ray
     concept_dicts = [
@@ -495,8 +740,8 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
         for c in concepts
     ]
 
-    # Launch parallel Ray tasks
-    futures = [generate_image_gemini.remote(concept, concept['graphic_number'])
+    # Launch parallel Ray tasks with logo
+    futures = [generate_image_gemini.remote(concept, concept['graphic_number'], logo_base64)
                for concept in concept_dicts]
 
     # Wait for results with progress tracking
@@ -541,12 +786,14 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
 
 # Build the LangGraph workflow
 workflow = StateGraph(CampaignState)
+workflow.add_node("capture_and_extract_brand", capture_and_extract_brand_node)
 workflow.add_node("company_profile", generate_company_profile_node)
 workflow.add_node("campaign_plan", generate_campaign_plan_node)
 workflow.add_node("graphic_concepts", generate_graphic_concepts_node)
 workflow.add_node("generate_images", generate_images_parallel_node)
 
-workflow.add_edge(START, "company_profile")
+workflow.add_edge(START, "capture_and_extract_brand")
+workflow.add_edge("capture_and_extract_brand", "company_profile")
 workflow.add_edge("company_profile", "campaign_plan")
 workflow.add_edge("campaign_plan", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
@@ -588,6 +835,9 @@ async def runner(inputs: dict, tracer: Tracer):
         "cta": inputs.get("cta"),
         "channels": inputs.get("channels"),
         "budget": inputs.get("budget"),
+        "screenshot_base64": None,
+        "brand_identity": None,
+        "logo_base64": None,
         "company_profile": "",
         "campaign_plan": "",
         "graphic_concepts": None,
