@@ -4,196 +4,26 @@ dotenv.load_dotenv()
 from kodosumi.core import ServeAPI
 app = ServeAPI()
 
-from jinja2 import Template
+from jinja2 import Environment, FileSystemLoader
 from kodosumi.core import forms as F
+from forms import campaign_form_model
 
-# Company profile generation template
-company_profile_template = Template("""
-    You are hired to advise a business on creating a digital ad and social media campaign consisting exclusively of static images. The following information is provided. Make reasonable assumptions to fill in the missing information as a basis for further planning:
-
-    Business Background
-    Name:
-    {{name}}
-    Address:
-    {{address}}
-    Business type and industry
-    {{industry}}
-    Unique value proposition
-    {{uvp}}
-    Current positioning: Premium, affordable, innovative, local, etc.?
-    MISSING
-    Target Audience
-    {{audience}}
-    Demographics: Age, gender, location, income, education
-    MISSING
-    Psychographics: Interests, values, lifestyle, motivations
-    MISSING
-    What problem do they solve for their customers?
-    {{problem}}
-    Goals & Objectives
-    Primary campaign goal: Awareness, leads, sales, repeat customers, event attendance, etc.
-    {{goal}}
-    KPIs: Click-through rate, cost per lead ...
-    MISSING
-    Timeframe: How long should the campaign run?
-    MISSING
-    Offer & Messaging
-    Core offer: Product/service, price point, special promotion, or bundle.
-    {{offer}}
-    Key messaging:What should the ad say to resonate with the target audience?
-    MISSING
-    Call-to-action:What action do you want people to take (buy, sign up, visit, etc.)?
-    {{cta}}
-    Budget & Resources
-    Ad spend: How much are they willing to invest?
-    {{budget}}
-    Media mix: Social media, Google Ads, print, radio, local sponsorships, etc.
-    Missing
-    Creative assets: Photos, testimonials, product shots. No videos or pictures of staff or real people or locations A logo matching the CI is already provided
-    MISSING
-    Internal capacity: Who will manage the campaign (in-house vs. agency)?
-    MISSING
-    Channels & Distribution
-    Digital platforms already in use:
-    Google Ads, Meta Ads,Email Marketing
-    Owned media: Website, blog, email list.
-    {{channels}}
-    Tracking & Optimization
-    Analytics setup: Google Analytics, Meta Pixel, CRM integration.
-    MISSING
-    Reporting cadence: Daily, weekly, monthly.
-    MISSING
-    Optimization plan: A/B testing headlines, creatives, offers, targeting.
-    MISSING
-    Feedback loop: How learnings will shape future campaigns.
-    MISSING
-
-    {% if brand_identity %}
-    EXTRACTED BRAND IDENTITY (from website analysis):
-    {{brand_identity}}
-
-    IMPORTANT: Use this brand identity information to:
-    1. Ensure all campaign visuals match the existing color palette
-    2. Maintain consistency with the established typography and design style
-    3. Align campaign tone with the brand personality
-    4. Incorporate visual patterns and UI/UX elements that match the brand
-    5. Make assumptions about positioning and target audience based on the visual brand analysis
-    {% endif %}
-
-    Provide a full overview of the combined information, integrating the brand identity analysis into your assumptions and recommendations.
-""")
-
-# Campaign form with company profile inputs
-campaign_form_model = F.Model(
-    F.Markdown("""
-    # AI Campaign Generator Agent
-    Generate a complete digital advertising campaign with AI-powered image creation.
-    """),
-    F.InputText(
-        name="name",
-        label="Business name",
-        placeholder="Name of your business",
-        required=True
-    ),
-    F.Select(
-        name="industry",
-        label="Business type",
-        option=[
-            F.InputOption("Healthcare", "healthcare"),
-            F.InputOption("Professional Services", "professional services"),
-            F.InputOption("Construction & Real Estate", "construction and real estate"),
-            F.InputOption("Manufacturing", "manufacturing"),
-            F.InputOption("Technology", "technology"),
-            F.InputOption("Transportation & Logistics", "transportation and logistics"),
-            F.InputOption("Education & Training", "education and training"),
-            F.InputOption("Finance & Insurance", "finance and insurance"),
-            F.InputOption("Retail & E-commerce", "retail and e-commerce"),
-            F.InputOption("Hospitality & Tourism", "hospitality and tourism"),
-            F.InputOption("Other", "other")
-        ]
-    ),
-    F.InputText(
-        name="address",
-        label="Address",
-        placeholder="123 Main St, City, State, Country",
-        required=False
-    ),
-    F.InputFiles(
-        name="logo",
-        label="Upload Logo (PNG, JPG)",
-        required=False,
-        multiple=False,
-        directory=False
-    ),
-    F.InputText(
-        name="website",
-        label="Website",
-        placeholder="https://www.yourwebsite.com",
-        required=True
-    ),
-    F.InputArea(
-        name="uvp",
-        label="Unique Value Proposition",
-        placeholder="What makes your business unique?",
-        required=True
-    ),
-    F.InputArea(
-        name="problem",
-        label="Problem you solve",
-        placeholder="What problem does your business solve for customers?",
-        required=True
-    ),
-    F.InputText(
-        name="audience",
-        label="Target audience",
-        placeholder="Describe your target audience",
-        required=False
-    ),
-    F.InputArea(
-        name="goal",
-        label="Primary campaign goal",
-        placeholder="What is your primary goal for this campaign? (e.g., brand awareness, lead generation, sales)",
-        required=True
-    ),
-    F.InputText(
-        name="language",
-        label="Output Language",
-        placeholder="Enter the language for your campaign (e.g., English, Spanish, French)",
-        required=True
-    ),
-    F.InputArea(
-        name="offer",
-        label="Core offer",
-        placeholder="Describe your core offer: Product/service, price point, special promotion, or bundle.",
-        required=False
-    ),
-    F.InputArea(
-        name="cta",
-        label="Call to action",
-        placeholder="What action do you want customers to take? (e.g., Sign up, Buy now, Learn more)",
-        required=False
-    ),
-    F.InputArea(
-        name="channels",
-        label="Owned marketing channels",
-        placeholder="List any owned marketing channels (e.g., website, social media, email list)",
-        required=False
-    ),
-    F.InputText(
-        name="budget",
-        label="Campaign budget",
-        placeholder="What is your budget for this campaign? (e.g., $5000 monthly)",
-        required=False
-    ),
-    F.Submit("Generate Campaign"),
-    F.Cancel("Cancel")
-)
+# campaign_form_model imported from forms.py
 
 import fastapi
 from kodosumi.core import Launch
 from kodosumi.core import Tracer
 from kodosumi.response import Markdown, HTML
 from pathlib import Path
+
+# Initialize Jinja2 environment after Path is available
+templates_dir = Path(__file__).parent / "templates"
+env = Environment(
+    loader=FileSystemLoader(str(templates_dir)),
+    autoescape=False,
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
 
 from langgraph.graph import StateGraph, START, END
 from langchain_openai import ChatOpenAI
@@ -252,6 +82,7 @@ class CampaignState(TypedDict):
     screenshot_base64: Optional[str]
     brand_identity: Optional[str]
     logo_base64: Optional[str]
+    logo_mime: Optional[str]
     company_profile: str
     graphic_concepts: Optional[GraphicConceptsOutput]
     generated_images: List[Dict]
@@ -292,13 +123,24 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
             fs = await tracer.fs()
             input_files = await fs.ls("in")
             logo_base64 = None
+            logo_mime = None
 
             if input_files:
                 await tracer.markdown("📎 Logo file detected, including in brand analysis...")
                 # Read the first uploaded file (logo)
-                logo_path = input_files[0]["path"]
-                logo_bytes = await fs.read(logo_path)
-                logo_base64 = base64.b64encode(logo_bytes).decode('utf-8')
+                async for local_path in fs.download(input_files[0]["path"]):
+                    logo_path = (local_path)
+                await tracer.markdown(f"Logo path: {logo_path}")
+                with open(logo_path, "rb") as f:
+                    logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+                # Detect image mime from extension (fallback to PNG)
+                logo_ext = Path(logo_path).suffix.lower()
+                if logo_ext in [".jpg", ".jpeg"]:
+                    logo_mime = "image/jpeg"
+                elif logo_ext == ".png":
+                    logo_mime = "image/png"
+                else:
+                    logo_mime = "image/png"
 
             await tracer.markdown("🔍 Analyzing brand identity with GPT-4o Vision...")
 
@@ -311,90 +153,9 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
 
             # Adjust prompt based on whether logo is available
             if logo_base64:
-                vision_prompt = """Analyze the provided website screenshot AND logo file to extract comprehensive brand identity (CI) information.
-
-                    Compare both images to understand the complete brand identity.
-
-                    Provide a detailed analysis including:
-
-                    1. **Color Palette**:
-                       - Primary colors (with hex codes if identifiable from both website and logo)
-                       - Secondary colors
-                       - Accent colors
-                       - Background/neutral colors
-                       - How the logo colors are used throughout the website
-
-                    2. **Typography & Text Style**:
-                       - Font style (modern, classic, playful, professional, etc.)
-                       - Text hierarchy and sizing
-                       - Typography personality
-                       - Any text in the logo and its style
-
-                    3. **Logo & Branding Elements**:
-                       - Detailed logo analysis (style, shapes, symbolism)
-                       - Logo characteristics (minimalist, detailed, icon-based, wordmark, combination mark, etc.)
-                       - How the logo is integrated into the website design
-                       - Brand symbols or icons derived from the logo
-
-                    4. **Visual Design Style**:
-                       - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
-                       - Layout patterns (grid-based, asymmetric, centered, etc.)
-                       - Use of whitespace
-                       - Image style (photography, illustrations, abstract, etc.)
-                       - How design elements echo the logo
-
-                    5. **Brand Tone & Personality**:
-                       - Professional, casual, friendly, authoritative, innovative, traditional, etc.
-                       - Emotional tone conveyed by design
-                       - Target audience implied by design choices
-                       - Brand personality expressed through logo and website
-
-                    6. **UI/UX Patterns**:
-                       - Button styles
-                       - Call-to-action prominence
-                       - Navigation style
-                       - Visual hierarchy
-
-                    Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+                vision_prompt = env.get_template("vision_with_logo.j2").render()
             else:
-                vision_prompt = """Analyze this website screenshot and extract comprehensive brand identity (CI) information.
-
-                    Provide a detailed analysis including:
-                    
-                    1. **Color Palette**:
-                       - Primary colors (with hex codes if identifiable)
-                       - Secondary colors
-                       - Accent colors
-                       - Background/neutral colors
-                    
-                    2. **Typography & Text Style**:
-                       - Font style (modern, classic, playful, professional, etc.)
-                       - Text hierarchy and sizing
-                       - Typography personality
-                    
-                    3. **Logo & Branding Elements**:
-                       - Logo placement and style
-                       - Logo characteristics (minimalist, detailed, icon-based, wordmark, etc.)
-                       - Brand symbols or icons
-                    
-                    4. **Visual Design Style**:
-                       - Overall aesthetic (minimalist, bold, elegant, playful, corporate, etc.)
-                       - Layout patterns (grid-based, asymmetric, centered, etc.)
-                       - Use of whitespace
-                       - Image style (photography, illustrations, abstract, etc.)
-                    
-                    5. **Brand Tone & Personality**:
-                       - Professional, casual, friendly, authoritative, innovative, traditional, etc.
-                       - Emotional tone conveyed by design
-                       - Target audience implied by design choices
-                    
-                    6. **UI/UX Patterns**:
-                       - Button styles
-                       - Call-to-action prominence
-                       - Navigation style
-                       - Visual hierarchy
-                    
-                    Be specific and detailed. This information will be used to create advertising campaigns that match the brand's existing identity."""
+                vision_prompt = env.get_template("vision_without_logo.j2").render()
 
             # Build content array for vision API
             content = [{"type": "text", "text": vision_prompt}]
@@ -409,10 +170,6 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
 
             # Add logo if available
             if logo_base64:
-                # Detect image format from file extension
-                logo_ext = Path(input_files[0]["path"]).suffix.lower()
-                logo_mime = "image/png" if logo_ext == ".png" else "image/jpeg"
-
                 content.append({
                     "type": "image_url",
                     "image_url": {
@@ -439,7 +196,8 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
                 **state,
                 "screenshot_base64": screenshot_base64,
                 "brand_identity": brand_identity,
-                "logo_base64": logo_base64,
+                    "logo_base64": logo_base64,
+                    "logo_mime": logo_mime,
                 "tracer": tracer
             }
 
@@ -452,6 +210,7 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
             "screenshot_base64": None,
             "brand_identity": None,
             "logo_base64": None,
+            "logo_mime": None,
             "tracer": tracer
         }
 
@@ -464,7 +223,7 @@ async def generate_company_profile_node(state: CampaignState) -> CampaignState:
     await tracer.markdown(f"Analyzing **{state['name']}** in the {state['industry']} industry...")
 
     # Render the template with form inputs and brand identity
-    prompt = company_profile_template.render(
+    prompt = env.get_template("company_profile.j2").render(
         name=state['name'],
         address=state.get('address', 'Not provided'),
         industry=state['industry'],
@@ -504,33 +263,15 @@ async def generate_graphic_concepts_node(state: CampaignState) -> CampaignState:
 
     # Check if logo is available
     has_logo = state.get('logo_base64') is not None
-    logo_instruction = "- A company logo is available and can be incorporated into designs where appropriate. Mention logo placement in descriptions where it makes sense (e.g., 'company logo in top-right corner')." if has_logo else "- No logo available, do not mention logos in descriptions."
 
-    prompt = f"""Based on this company profile, give an overview of all graphics that will make up the final campaign.
-
-COMPANY PROFILE:
-{state['company_profile']}
-
-REQUIREMENTS:
-- Language for all copy: {state['language']}
-- Static images only (no videos, no real people, no real locations)
-{logo_instruction}
-- Images should work for: Google Ads, Meta Ads, Email Marketing
-
-Give an overview of all graphics that will make up the final campaign. Format it as a structured list including the following information:
-- Graphic number
-- Detailed description of the graphic (be very specific about composition, colors, style, objects, mood - at least 4-5 sentences for AI image generation. Do NOT include people{', but MAY mention logo placement if appropriate' if has_logo else ''})
-- Target platform (e.g., Instagram Feed, Facebook Ad, Google Display Banner, Email Header)
-- Resolution (standard sizes: 1080x1080 for square, 1200x628 for Facebook, 1080x1920 for stories, 728x90 for banners, etc.)
-- Headline text (in {state['language']})
-- Subtext (in {state['language']})
-- Call to action (in {state['language']})
-
-If a graphic is required in multiple resolutions, it should be split across multiple rows with the same full image description.
-
-Create at least 10 distinct graphic concepts (may result in more rows if multiple resolutions are needed).
-
-Also provide a brief campaign overview explaining the graphics strategy."""
+    prompt = env.get_template("graphic_concepts.j2").render(
+        company_profile=state['company_profile'],
+        language=state['language'],
+        has_logo=has_logo
+    )
+    
+    await tracer.markdown("### Graphic Concepts Prompt")
+    await tracer.markdown(prompt)
 
     structured_llm = llm.with_structured_output(GraphicConceptsOutput)
     graphic_concepts = await structured_llm.ainvoke(prompt)
@@ -542,10 +283,11 @@ Also provide a brief campaign overview explaining the graphics strategy."""
 
     # Display as table
     await tracer.markdown("### Graphics Table")
-    await tracer.markdown("| # | Platform | Resolution | Headline |")
+    await tracer.markdown("")
+    await tracer.markdown("| # | Platform | Resolution | Headline | Description |")
     await tracer.markdown("|---|----------|------------|----------|")
     for concept in graphic_concepts.concepts:
-        await tracer.markdown(f"| {concept.graphic_number} | {concept.target_platform} | {concept.resolution} | {concept.copy_headline[:50]}... |")
+        await tracer.markdown(f"| {concept.graphic_number} | {concept.target_platform} | {concept.resolution} | {concept.copy_headline} | {concept.description} |")
 
     return {
         **state,
@@ -556,9 +298,19 @@ Also provide a brief campaign overview explaining the graphics strategy."""
 
 # Ray remote function for Gemini image generation
 @ray.remote
-def generate_image_gemini(concept: dict, concept_number: int, logo_base64: Optional[str] = None) -> Dict:
+def generate_image_gemini(concept: dict, concept_number: int, logo_base64: Optional[str] = None, logo_mime: Optional[str] = None) -> Dict:
     """Generate an image using Gemini 2.5 Flash Image and overlay logo if provided"""
-    from google import genai
+    try:
+        from google import genai
+    except ImportError:
+        return {
+            "graphic_number": concept_number,
+            "target_platform": concept.get('target_platform', 'Unknown'),
+            "resolution": concept.get('resolution', 'Unknown'),
+            "error": "google-genai package not installed",
+            "runtime": 0
+        }
+    
     import datetime
     import os
     import time
@@ -591,20 +343,15 @@ def generate_image_gemini(concept: dict, concept_number: int, logo_base64: Optio
 
         for attempt in range(max_retries):
             try:
-                # Check if description mentions logo and logo is available
-                description_lower = concept['description'].lower()
-                include_logo = logo_base64 and ('logo' in description_lower)
-
-                # Build contents for Gemini
-                if include_logo:
-                    # Include logo image as reference
+                # Build contents for Gemini; always include logo if provided
+                if logo_base64:
                     from google.genai import types
                     contents = [
-                        types.Part.from_text(full_prompt),
                         types.Part.from_bytes(
                             data=base64.b64decode(logo_base64),
-                            mime_type="image/png"
-                        )
+                            mime_type=(logo_mime or "image/png")
+                        ),
+                        full_prompt
                     ]
                 else:
                     contents = [full_prompt]
@@ -679,6 +426,7 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
 
     # Get logo from state
     logo_base64 = state.get('logo_base64')
+    logo_mime = state.get('logo_mime')
     if logo_base64:
         await tracer.markdown("🎨 Logo will be incorporated into graphics where mentioned in descriptions")
 
@@ -697,7 +445,7 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
     ]
 
     # Launch parallel Ray tasks with logo
-    futures = [generate_image_gemini.remote(concept, concept['graphic_number'], logo_base64)
+    futures = [generate_image_gemini.remote(concept, concept['graphic_number'], logo_base64, logo_mime)
                for concept in concept_dicts]
 
     # Wait for results with progress tracking
@@ -792,6 +540,7 @@ async def runner(inputs: dict, tracer: Tracer):
         "screenshot_base64": None,
         "brand_identity": None,
         "logo_base64": None,
+        "logo_mime": None,
         "company_profile": "",
         "graphic_concepts": None,
         "generated_images": [],
@@ -871,7 +620,7 @@ async def runner(inputs: dict, tracer: Tracer):
 async def enter(request: fastapi.Request, inputs: dict):
     return Launch(
         request,
-        "app:runner",
+        "app.app:runner",
         inputs=inputs
     )
 
@@ -884,12 +633,3 @@ class CampaignGeneratorAgent:
     pass
 
 fast_app = CampaignGeneratorAgent.bind()
-
-import uvicorn
-if __name__ == "__main__":
-    uvicorn.run(
-        "app:fast_app",
-        host="0.0.0.0",
-        port=8014,
-        reload=True
-    )
