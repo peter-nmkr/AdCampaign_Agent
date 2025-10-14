@@ -86,6 +86,7 @@ class CampaignState(TypedDict):
     company_profile: str
     graphic_concepts: Optional[GraphicConceptsOutput]
     generated_images: List[Dict]
+    image_copy_replacements: List[Dict]
 
     tracer: Tracer
 
@@ -487,6 +488,169 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
         "tracer": tracer
     }
 
+@ray.remote
+def replace_image_copy_openai(headline: str, subtext: str, call_to_action: str, image_base64: str, graphic_number: int) -> dict:
+    """
+    Calls OpenAI Vision API to replace text on a provided image using the replace_copy.j2 template.
+    Returns a dict with result or error.
+    """
+    import os
+    import datetime
+    from openai import OpenAI
+    import base64
+    from jinja2 import Environment, FileSystemLoader
+    from pathlib import Path
+
+    try:
+        t0 = datetime.datetime.now()
+        
+        # Prepare OpenAI client
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return {
+                "graphic_number": graphic_number,
+                "error": "OPENAI_API_KEY not set",
+                "runtime": 0
+            }
+        client = OpenAI(api_key=api_key)
+
+        # Initialize Jinja2 environment for template
+        templates_dir = Path(__file__).parent / "templates"
+        env = Environment(
+            loader=FileSystemLoader(str(templates_dir)),
+            autoescape=False,
+            trim_blocks=True,
+            lstrip_blocks=True,
+        )
+        
+        # Render the prompt template
+        prompt = env.get_template("replace_copy.j2").render(
+            copy_headline=headline,
+            copy_subtext=subtext,
+            call_to_action=call_to_action
+        )
+
+        # Call OpenAI API (GPT-4o vision)
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}}
+                    ],
+                },
+            ],
+            max_tokens=500,
+        )
+
+        runtime = (datetime.datetime.now() - t0).total_seconds()
+        
+        # Note: Vision API analyzes images but doesn't modify them
+        # The response contains instructions/analysis, not a modified image
+        return {
+            "graphic_number": graphic_number,
+            "result": response.choices[0].message.content,
+            "input_prompt": prompt,
+            "original_image_data": image_base64,
+            "error": None,
+            "runtime": runtime
+        }
+    except Exception as e:
+        return {
+            "graphic_number": graphic_number,
+            "error": f"OpenAI Vision API error: {e}",
+            "runtime": 0
+        }
+
+async def replace_image_copy_node(state: CampaignState) -> CampaignState:
+    """
+    Node to call replace_image_copy_openai for each generated image in the state in parallel.
+    Adds the results to 'image_copy_replacements' field in the state.
+    """
+    tracer = state["tracer"]
+    generated_images = state.get("generated_images", [])
+    
+    await tracer.markdown("# Step 5: Replacing Copy in Images with GPT Vision")
+    await tracer.markdown(f"Analyzing {len(generated_images)} graphics for copy replacement...")
+    await tracer.markdown("")
+    await tracer.markdown("⚠️ **Note:** GPT-4o Vision analyzes images and provides instructions, but doesn't directly modify them.")
+    await tracer.markdown("")
+    
+    if not generated_images:
+        await tracer.markdown("❌ No images to process!")
+        return {
+            **state,
+            "image_copy_replacements": [],
+            "tracer": tracer
+        }
+
+    # Filter out images with errors
+    valid_images = [img for img in generated_images if not img.get('error')]
+    
+    if not valid_images:
+        await tracer.markdown("❌ No valid images to process!")
+        return {
+            **state,
+            "image_copy_replacements": [],
+            "tracer": tracer
+        }
+
+    # Launch parallel Ray tasks
+    futures = [
+        replace_image_copy_openai.remote(
+            img.get('headline', ''),
+            img.get('subtext', ''),
+            img.get('cta', ''),
+            img.get('image_data', ''),
+            img['graphic_number']
+        )
+        for img in valid_images
+    ]
+
+    # Wait for results with progress tracking
+    unready = futures.copy()
+    completed = 0
+    results = []
+
+    while unready:
+        ready, unready = ray.wait(unready, num_returns=1, timeout=1)
+        if ready:
+            result = ray.get(ready[0])
+            results.append(result)
+            completed += 1
+            progress = completed / len(valid_images) * 100
+
+            await tracer.markdown(f"## Image {completed}/{len(valid_images)} ({progress:.0f}%)")
+            await tracer.markdown(f"**Graphic #{result.get('graphic_number')}**")
+
+            if result.get('error'):
+                await tracer.markdown(f"❌ Error: {result['error']}")
+            else:
+                await tracer.markdown(f"✅ Analyzed in {result['runtime']:.2f}s")
+                if result.get('result'):
+                    await tracer.markdown("### Copy Replacement Analysis:")
+                    await tracer.markdown(result['result'])
+
+            await tracer.html("<hr style='margin: 20px 0;' />")
+
+        await asyncio.sleep(0.1)
+
+    # Sort results by graphic number
+    results.sort(key=lambda x: x.get('graphic_number', 999))
+
+    await tracer.markdown(f"## ✨ All {len(valid_images)} Images Analyzed!")
+
+    return {
+        **state,
+        "image_copy_replacements": results,
+        "tracer": tracer
+    }
+
+
+
+
 
 # Build the LangGraph workflow
 workflow = StateGraph(CampaignState)
@@ -494,12 +658,14 @@ workflow.add_node("capture_and_extract_brand", capture_and_extract_brand_node)
 workflow.add_node("company_profile", generate_company_profile_node)
 workflow.add_node("graphic_concepts", generate_graphic_concepts_node)
 workflow.add_node("generate_images", generate_images_parallel_node)
+workflow.add_node("replace_image_copy", replace_image_copy_node)
 
 workflow.add_edge(START, "capture_and_extract_brand")
 workflow.add_edge("capture_and_extract_brand", "company_profile")
 workflow.add_edge("company_profile", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
-workflow.add_edge("generate_images", END)
+workflow.add_edge("generate_images", "replace_image_copy")
+workflow.add_edge("replace_image_copy", END)
 
 graph = workflow.compile()
 
@@ -544,6 +710,7 @@ async def runner(inputs: dict, tracer: Tracer):
         "company_profile": "",
         "graphic_concepts": None,
         "generated_images": [],
+        "image_copy_replacements": [],
         "tracer": tracer
     })
 
@@ -574,6 +741,12 @@ async def runner(inputs: dict, tracer: Tracer):
     html.append("<h2 style='color: #1e40af; margin-top: 50px; font-size: 2em;'>📸 Campaign Graphics</h2>")
     html.append(f"<p style='color: #64748b; margin-bottom: 30px;'>{len(result['generated_images'])} graphics generated</p>")
 
+    # Create a lookup dict for copy replacements by graphic number
+    replacements_by_number = {
+        replacement['graphic_number']: replacement 
+        for replacement in result.get('image_copy_replacements', [])
+    }
+
     for img_result in result['generated_images']:
         if img_result.get('error'):
             html.append(f"<div style='background: #fee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;'>")
@@ -595,6 +768,19 @@ async def runner(inputs: dict, tracer: Tracer):
             html.append(f"<p><strong style='color: #475569;'>Subtext:</strong> {img_result['subtext']}</p>")
             html.append(f"<p><strong style='color: #475569;'>Call to Action:</strong> {img_result['cta']}</p>")
             html.append("</div>")
+
+            # Add GPT Vision Copy Replacement Analysis
+            replacement = replacements_by_number.get(img_result['graphic_number'])
+            if replacement and replacement.get('result'):
+                html.append("<div style='background: #f0fdf4; padding: 20px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #22c55e;'>")
+                html.append(f"<h4 style='color: #166534; margin-top: 0;'>🔄 Copy Replacement Analysis</h4>")
+                replacement_html = replacement['result'].replace('\n', '<br>')
+                html.append(f"<div style='color: #15803d; line-height: 1.6;'>{replacement_html}</div>")
+                html.append("</div>")
+            elif replacement and replacement.get('error'):
+                html.append("<div style='background: #fef3c7; padding: 15px; border-radius: 8px; margin-top: 15px;'>")
+                html.append(f"<p style='color: #92400e; margin: 0;'>⚠️ Copy Analysis Error: {replacement['error']}</p>")
+                html.append("</div>")
 
             html.append(f"<p style='color: #94a3b8; font-size: 0.85em; margin-top: 10px;'>⚡ Generated in {img_result['runtime']:.2f}s</p>")
             html.append("</div>")
