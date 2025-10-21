@@ -55,10 +55,10 @@ ray_results/
 data/
 
 # Generated images
-*.png
-*.jpg
-*.jpeg
-*.gif
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
 !static/**
 
 # Jupyter Notebook
