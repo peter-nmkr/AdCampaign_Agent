@@ -1,0 +1,468 @@
+{
+    "schema_name": "DoclingDocument",
+    "version": "1.7.0",
+    "name": "wrongSpelling_sample",
+    "origin": {
+        "mimetype": "application/pdf",
+        "binary_hash": 7472867944716163582,
+        "filename": "wrongSpelling_sample.png"
+    },
+    "furniture": {
+        "self_ref": "#/furniture",
+        "children": [],
+        "content_layer": "furniture",
+        "name": "_root_",
+        "label": "unspecified"
+    },
+    "body": {
+        "self_ref": "#/body",
+        "children": [
+            {
+                "$ref": "#/pictures/0"
+            },
+            {
+                "$ref": "#/texts/0"
+            },
+            {
+                "$ref": "#/texts/1"
+            },
+            {
+                "$ref": "#/texts/2"
+            },
+            {
+                "$ref": "#/texts/3"
+            },
+            {
+                "$ref": "#/texts/4"
+            },
+            {
+                "$ref": "#/texts/5"
+            },
+            {
+                "$ref": "#/texts/6"
+            },
+            {
+                "$ref": "#/pictures/1"
+            },
+            {
+                "$ref": "#/texts/8"
+            },
+            {
+                "$ref": "#/texts/9"
+            },
+            {
+                "$ref": "#/texts/10"
+            },
+            {
+                "$ref": "#/texts/11"
+            }
+        ],
+        "content_layer": "body",
+        "name": "_root_",
+        "label": "unspecified"
+    },
+    "groups": [],
+    "texts": [
+        {
+            "self_ref": "#/texts/0",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "section_header",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 37.16129048665365,
+                        "t": 917.1612955729166,
+                        "r": 502.7096761067708,
+                        "b": 816.0,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        33
+                    ]
+                }
+            ],
+            "orig": "Finde dein nachtes Lieblingsbuch!",
+            "text": "Finde dein nachtes Lieblingsbuch!",
+            "level": 1
+        },
+        {
+            "self_ref": "#/texts/1",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 33.54838562011719,
+                        "t": 805.6774291992188,
+                        "r": 632.774169921875,
+                        "b": 738.0645345052083,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        56
+                    ]
+                }
+            ],
+            "orig": "UnsereRegale sind gefulltmit enizignitting Geschichtens.",
+            "text": "UnsereRegale sind gefulltmit enizignitting Geschichtens."
+        },
+        {
+            "self_ref": "#/texts/2",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 57.29031880696615,
+                        "t": 705.0322672526042,
+                        "r": 325.6774088541667,
+                        "b": 679.225830078125,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        17
+                    ]
+                }
+            ],
+            "orig": "Entecken Sie mehr",
+            "text": "Entecken Sie mehr"
+        },
+        {
+            "self_ref": "#/texts/3",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 228.1290283203125,
+                        "t": 243.09676106770837,
+                        "r": 236.3870849609375,
+                        "b": 232.77425130208337,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        1
+                    ]
+                }
+            ],
+            "orig": "n",
+            "text": "n"
+        },
+        {
+            "self_ref": "#/texts/4",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 391.741943359375,
+                        "t": 434.06453450520837,
+                        "r": 404.1290283203125,
+                        "b": 417.03226725260413,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        1
+                    ]
+                }
+            ],
+            "orig": "\u039b",
+            "text": "\u039b"
+        },
+        {
+            "self_ref": "#/texts/5",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 530.5806477864584,
+                        "t": 219.87101236979163,
+                        "r": 541.9354654947916,
+                        "b": 199.225830078125,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        1
+                    ]
+                }
+            ],
+            "orig": "\u4e09",
+            "text": "\u4e09"
+        },
+        {
+            "self_ref": "#/texts/6",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 528.0,
+                        "t": 173.935546875,
+                        "r": 545.5483805338541,
+                        "b": 140.90323893229163,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        1
+                    ]
+                }
+            ],
+            "orig": "G",
+            "text": "G"
+        },
+        {
+            "self_ref": "#/texts/7",
+            "parent": {
+                "$ref": "#/pictures/1"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 746.8387044270834,
+                        "t": 883.6129048665365,
+                        "r": 929.0322265625,
+                        "b": 822.7096761067709,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        10
+                    ]
+                }
+            ],
+            "orig": "BUCHERireh",
+            "text": "BUCHERireh"
+        },
+        {
+            "self_ref": "#/texts/8",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 725.6774088541666,
+                        "t": 432.51615397135413,
+                        "r": 742.1935221354166,
+                        "b": 416.51615397135413,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        1
+                    ]
+                }
+            ],
+            "orig": "\u4e2d",
+            "text": "\u4e2d"
+        },
+        {
+            "self_ref": "#/texts/9",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 722.5806477864584,
+                        "t": 407.741943359375,
+                        "r": 746.3225911458334,
+                        "b": 341.67744954427087,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        2
+                    ]
+                }
+            ],
+            "orig": "00",
+            "text": "00"
+        },
+        {
+            "self_ref": "#/texts/10",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 860.3870442708334,
+                        "t": 440.25809733072913,
+                        "r": 888.258056640625,
+                        "b": 309.67740885416663,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        5
+                    ]
+                }
+            ],
+            "orig": "XXXXX",
+            "text": "XXXXX"
+        },
+        {
+            "self_ref": "#/texts/11",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "text",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 730.3225911458334,
+                        "t": 244.12906901041663,
+                        "r": 743.2257486979166,
+                        "b": 233.29036458333337,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        2
+                    ]
+                }
+            ],
+            "orig": "YI",
+            "text": "YI"
+        }
+    ],
+    "pictures": [
+        {
+            "self_ref": "#/pictures/0",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [],
+            "content_layer": "body",
+            "label": "picture",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 35.58233642578125,
+                        "t": 998.2248039245605,
+                        "r": 711.4598999023438,
+                        "b": 931.6305389404297,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        0
+                    ]
+                }
+            ],
+            "captions": [],
+            "references": [],
+            "footnotes": [],
+            "annotations": []
+        },
+        {
+            "self_ref": "#/pictures/1",
+            "parent": {
+                "$ref": "#/body"
+            },
+            "children": [
+                {
+                    "$ref": "#/texts/7"
+                }
+            ],
+            "content_layer": "body",
+            "label": "picture",
+            "prov": [
+                {
+                    "page_no": 1,
+                    "bbox": {
+                        "l": 742.6474609375,
+                        "t": 999.3744506835938,
+                        "r": 972.742919921875,
+                        "b": 759.9994812011719,
+                        "coord_origin": "BOTTOMLEFT"
+                    },
+                    "charspan": [
+                        0,
+                        0
+                    ]
+                }
+            ],
+            "captions": [],
+            "references": [],
+            "footnotes": [],
+            "annotations": []
+        }
+    ],
+    "tables": [],
+    "key_value_items": [],
+    "form_items": [],
+    "pages": {
+        "1": {
+            "size": {
+                "width": 1024.0,
+                "height": 1024.0
+            },
+            "page_no": 1
+        }
+    }
+}
