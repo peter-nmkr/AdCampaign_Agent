@@ -54,9 +54,9 @@ class GraphicConcept(BaseModel):
     target_platform: str = Field(
         description="Target platform (e.g., Instagram Feed, Facebook Ad, Google Display, Email Header)"
     )
-    resolution: str = Field(
-        description="Image resolution (e.g., 1080x1080, 1200x628, 1920x1080)"
-    )
+    #resolution: Optional[str] = Field(
+    #    description="Image resolution (e.g., 1080x1080, 1200x628, 1920x1080)"
+    #)
     copy_headline: str = Field(description="Headline text for the graphic")
     copy_subtext: str = Field(description="Supporting text/subtext")
     call_to_action: str = Field(description="Call to action text")
@@ -69,7 +69,7 @@ class GraphicConceptsOutput(BaseModel):
         description="Brief overview of the campaign graphics strategy"
     )
     concepts: List[GraphicConcept] = Field(
-        description="List of all graphic concepts (may be more than 10 if multiple resolutions needed)"
+        description="List of all graphic concepts"
     )
 
 
@@ -312,11 +312,11 @@ async def generate_graphic_concepts_node(state: CampaignState) -> CampaignState:
     # Display as table
     await tracer.markdown("### Graphics Table")
     await tracer.markdown("")
-    await tracer.markdown("| # | Platform | Resolution | Headline | Description |")
-    await tracer.markdown("|---|----------|------------|----------|")
+    await tracer.markdown("| # | Platform | Headline | Description |")
+    await tracer.markdown("|---|----------|----------|-------------|")
     for concept in graphic_concepts.concepts:
         await tracer.markdown(
-            f"| {concept.graphic_number} | {concept.target_platform} | {concept.resolution} | {concept.copy_headline} | {concept.description} |"
+            f"| {concept.graphic_number} | {concept.target_platform} | {concept.copy_headline} | {concept.description} |"
         )
 
     # save concept text as json
@@ -353,7 +353,6 @@ def generate_image_gemini(
         return {
             "graphic_number": concept_number,
             "target_platform": concept.get("target_platform", "Unknown"),
-            "resolution": concept.get("resolution", "Unknown"),
             "error": "google-genai package not installed",
             "runtime": 0,
         }
@@ -366,12 +365,7 @@ def generate_image_gemini(
     try:
         t0 = datetime.datetime.now()
 
-        # Assemble prompt
-        resolution = concept.get("resolution", "1080x1080")
-        try:
-            width, height = map(int, resolution.split("x"))
-        except:
-            width, height = 1080, 1080
+        width, height = 1, 1
         headline = concept.get("copy_headline", "")
         subtext = concept.get("copy_subtext", "")
         cta = concept.get("call_to_action", "")
@@ -447,7 +441,6 @@ def generate_image_gemini(
             return {
                 "graphic_number": concept_number,
                 "target_platform": concept.get("target_platform", "Unknown"),
-                "resolution": resolution,
                 "error": "Failed to generate valid image data",
             }
 
@@ -456,7 +449,6 @@ def generate_image_gemini(
         return {
             "graphic_number": concept_number,
             "target_platform": concept.get("target_platform", "Unknown"),
-            "resolution": resolution,
             "image_path": None,
             "image_data": base64.b64encode(image_bytes).decode("utf-8"),
             "headline": concept.get("copy_headline", ""),
@@ -470,7 +462,6 @@ def generate_image_gemini(
         return {
             "graphic_number": concept_number,
             "target_platform": concept.get("target_platform", "Unknown"),
-            "resolution": concept.get("resolution", "Unknown"),
             "error": str(e),
             "runtime": 0,
         }
@@ -499,7 +490,6 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
             "graphic_number": c.graphic_number,
             "description": c.description,
             "target_platform": c.target_platform,
-            "resolution": c.resolution,
             "copy_headline": c.copy_headline,
             "copy_subtext": c.copy_subtext,
             "call_to_action": c.call_to_action,
@@ -535,7 +525,7 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
                 f"## Image {completed}/{len(concepts)} ({progress:.0f}%)"
             )
             await tracer.markdown(
-                f"**Graphic #{result.get('graphic_number')} - {result.get('target_platform')}** ({result.get('resolution', 'N/A')})"
+                f"**Graphic #{result.get('graphic_number')} - {result.get('target_platform')}**"
             )
 
             if result.get("error"):
@@ -687,9 +677,6 @@ async def runner(inputs: dict, tracer: Tracer):
             )
             html.append(
                 f"<h3 style='color: #1e40af;'>Graphic #{img_result['graphic_number']}: {img_result['target_platform']}</h3>"
-            )
-            html.append(
-                f"<p style='color: #64748b; font-size: 0.9em; margin-bottom: 15px;'><strong>Resolution:</strong> {img_result['resolution']}</p>"
             )
 
             # Display image
