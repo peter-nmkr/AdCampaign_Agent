@@ -568,7 +568,7 @@ graph = workflow.compile()
 
 # Main runner function
 async def runner(inputs: dict, tracer: Tracer):
-    await tracer.markdown(f"# 🚀 AI Campaign Generator")
+    await tracer.markdown(f"# Ad Campaign Generator")
     await tracer.markdown(f"Creating complete campaign for **{inputs.get('name')}**")
 
     # Handle uploaded logo if any
@@ -576,7 +576,6 @@ async def runner(inputs: dict, tracer: Tracer):
     input_files = await fs.ls("in")
 
     if input_files:
-        await tracer.markdown("## 📎 Logo Uploaded:")
         for file in input_files:
             path = file["path"]
             name = Path(path).name
@@ -619,115 +618,69 @@ async def runner(inputs: dict, tracer: Tracer):
 
     # Header
     html.append(
-        f"<h1 style='color: #1e40af; border-bottom: 3px solid #3b82f6; padding-bottom: 10px;'>"
+        f"<h1>"
     )
-    html.append(f"📊 Campaign for {result['name']}</h1>")
-    html.append(
-        f"<p style='font-size: 1.2em; color: #64748b; margin: 20px 0;'>{result['industry']}</p>"
-    )
-
-    # Company Profile Section
-    html.append(
-        "<div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px; margin: 30px 0;'>"
-    )
-    html.append("<h2>🏢 Company Profile</h2>")
-    profile_html = result["company_profile"].replace("\n", "<br>")
-    html.append(f"<div style='line-height: 1.6;'>{profile_html}</div>")
-    html.append("</div>")
-
-    # (Removed) Campaign Plan Section
+    html.append(f"Campaign for {result['name']}</h1>")
 
     # Graphics Overview
     html.append(
-        "<div style='background: #fefce8; padding: 30px; border-radius: 12px; margin: 30px 0; border-left: 5px solid #eab308;'>"
+        "<div>"
     )
-    html.append("<h2 style='color: #854d0e;'>🎨 Graphics Overview</h2>")
+    html.append("<h2>Graphics Overview</h2>")
     html.append(
-        f"<p style='color: #713f12;'>{result['graphic_concepts'].campaign_overview}</p>"
+        f"<p>{result['graphic_concepts'].campaign_overview}</p>"
     )
     html.append("</div>")
 
     # Generated Graphics Section
     html.append(
-        "<h2 style='color: #1e40af; margin-top: 50px; font-size: 2em;'>📸 Campaign Graphics</h2>"
+        "<h2>Campaign Graphics</h2>"
     )
     html.append(
-        f"<p style='color: #64748b; margin-bottom: 30px;'>{len(result['generated_images'])} graphics generated</p>"
+        f"<p>{len(result['generated_images'])} graphics generated</p>"
     )
-
-    # Create a lookup dict for copy replacements by graphic number
-    replacements_by_number = {
-        replacement["graphic_number"]: replacement
-        for replacement in result.get("image_copy_replacements", [])
-    }
 
     for img_result in result["generated_images"]:
         if img_result.get("error"):
             html.append(
-                f"<div style='background: #fee; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;'>"
+                f"<div>"
             )
             html.append(
-                f"<h3 style='color: #991b1b;'>Graphic #{img_result['graphic_number']} - {img_result.get('target_platform', 'Unknown')}</h3>"
+                f"<h3>Graphic #{img_result['graphic_number']} - {img_result['headline']}</h3>"
             )
-            html.append(f"<p style='color: #dc2626;'>Error: {img_result['error']}</p>")
+            html.append(f"<p>Error: {img_result['error']}</p>")
             html.append("</div>")
         else:
             html.append(
-                "<div style='background: white; padding: 25px; border-radius: 12px; margin: 30px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);'>"
+                "<div>"
             )
             html.append(
-                f"<h3 style='color: #1e40af;'>Graphic #{img_result['graphic_number']}: {img_result['target_platform']}</h3>"
+                f"<h3>Graphic #{img_result['graphic_number']}: {img_result['headline']}</h3>"
             )
 
             # Display image
             html.append(
-                f'<img src="data:image/png;base64,{img_result["image_data"]}" style="width: 100%; max-width: 800px; border-radius: 8px; margin: 15px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" />'
+                f'<img src="data:image/png;base64,{img_result["image_data"]}">'
             )
 
             # Copy elements
             html.append(
-                "<div style='background: #f8fafc; padding: 20px; border-radius: 8px; margin-top: 15px;'>"
+                "<div>"
             )
             html.append(
-                f"<h4 style='color: #334155; margin-top: 0;'>📝 Copy Elements</h4>"
+                f"<h4>Copy Elements</h4>"
             )
             html.append(
-                f"<p><strong style='color: #475569;'>Headline:</strong> {img_result['headline']}</p>"
+                f"<p><strong>Headline:</strong> {img_result['headline']}</p>"
             )
             html.append(
-                f"<p><strong style='color: #475569;'>Subtext:</strong> {img_result['subtext']}</p>"
+                f"<p><strong>Subtext:</strong> {img_result['subtext']}</p>"
             )
             html.append(
-                f"<p><strong style='color: #475569;'>Call to Action:</strong> {img_result['cta']}</p>"
+                f"<p><strong>Call to Action:</strong> {img_result['cta']}</p>"
             )
             html.append("</div>")
 
-            # Add GPT Vision Copy Replacement Analysis
-            replacement = replacements_by_number.get(img_result["graphic_number"])
-            if replacement and replacement.get("result"):
-                html.append(
-                    "<div style='background: #f0fdf4; padding: 20px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #22c55e;'>"
-                )
-                html.append(
-                    f"<h4 style='color: #166534; margin-top: 0;'>🔄 Copy Replacement Analysis</h4>"
-                )
-                replacement_html = replacement["result"].replace("\n", "<br>")
-                html.append(
-                    f"<div style='color: #15803d; line-height: 1.6;'>{replacement_html}</div>"
-                )
-                html.append("</div>")
-            elif replacement and replacement.get("error"):
-                html.append(
-                    "<div style='background: #fef3c7; padding: 15px; border-radius: 8px; margin-top: 15px;'>"
-                )
-                html.append(
-                    f"<p style='color: #92400e; margin: 0;'>⚠️ Copy Analysis Error: {replacement['error']}</p>"
-                )
-                html.append("</div>")
-
-            html.append(
-                f"<p style='color: #94a3b8; font-size: 0.85em; margin-top: 10px;'>⚡ Generated in {img_result['runtime']:.2f}s</p>"
-            )
             html.append("</div>")
 
     html.append("</div>")
