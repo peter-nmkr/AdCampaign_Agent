@@ -13,8 +13,8 @@ import base64
 import io
 from docling.datamodel.base_models import DocumentStream
 from PIL import Image
-import gemini_text_removal
-from helper import mask_fill_text_boxes
+import .gemini_text_removal
+from .helper import mask_fill_text_boxes
 
 
 def replace_text(image_path, copy_elements):

@@ -4,7 +4,7 @@ import json
 import PIL
 from PIL import Image, ImageDraw, ImageFont, ImageText
 import os
-from gemini_text_removal import remove_text
+from .gemini_text_removal import remove_text
 
 
 def filter_texts_for_copy(texts, copy_elements):

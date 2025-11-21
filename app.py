@@ -9,7 +9,7 @@ app = ServeAPI()
 
 from jinja2 import Environment, FileSystemLoader
 from kodosumi.core import forms as F
-from forms import campaign_form_model
+from .forms import campaign_form_model
 
 # campaign_form_model imported from forms.py
 
@@ -38,7 +38,7 @@ import base64
 import io
 import time
 from PIL import Image
-from helper import extend_image_to_square
+from .helper import extend_image_to_square
 
 
 # Pydantic models for structured output (only for graphic concepts)
@@ -54,9 +54,9 @@ class GraphicConcept(BaseModel):
     target_platform: str = Field(
         description="Target platform (e.g., Instagram Feed, Facebook Ad, Google Display, Email Header)"
     )
-    #resolution: Optional[str] = Field(
+    # resolution: Optional[str] = Field(
     #    description="Image resolution (e.g., 1080x1080, 1200x628, 1920x1080)"
-    #)
+    # )
     copy_headline: str = Field(description="Headline text for the graphic")
     copy_subtext: str = Field(description="Supporting text/subtext")
     call_to_action: str = Field(description="Call to action text")
@@ -68,9 +68,7 @@ class GraphicConceptsOutput(BaseModel):
     campaign_overview: str = Field(
         description="Brief overview of the campaign graphics strategy"
     )
-    concepts: List[GraphicConcept] = Field(
-        description="List of all graphic concepts"
-    )
+    concepts: List[GraphicConcept] = Field(description="List of all graphic concepts")
 
 
 # Initialize LLM
@@ -617,68 +615,42 @@ async def runner(inputs: dict, tracer: Tracer):
     ]
 
     # Header
-    html.append(
-        f"<h1>"
-    )
+    html.append(f"<h1>")
     html.append(f"Campaign for {result['name']}</h1>")
 
     # Graphics Overview
-    html.append(
-        "<div>"
-    )
+    html.append("<div>")
     html.append("<h2>Graphics Overview</h2>")
-    html.append(
-        f"<p>{result['graphic_concepts'].campaign_overview}</p>"
-    )
+    html.append(f"<p>{result['graphic_concepts'].campaign_overview}</p>")
     html.append("</div>")
 
     # Generated Graphics Section
-    html.append(
-        "<h2>Campaign Graphics</h2>"
-    )
-    html.append(
-        f"<p>{len(result['generated_images'])} graphics generated</p>"
-    )
+    html.append("<h2>Campaign Graphics</h2>")
+    html.append(f"<p>{len(result['generated_images'])} graphics generated</p>")
 
     for img_result in result["generated_images"]:
         if img_result.get("error"):
-            html.append(
-                f"<div>"
-            )
+            html.append(f"<div>")
             html.append(
                 f"<h3>Graphic #{img_result['graphic_number']} - {img_result['headline']}</h3>"
             )
             html.append(f"<p>Error: {img_result['error']}</p>")
             html.append("</div>")
         else:
-            html.append(
-                "<div>"
-            )
+            html.append("<div>")
             html.append(
                 f"<h3>Graphic #{img_result['graphic_number']}: {img_result['headline']}</h3>"
             )
 
             # Display image
-            html.append(
-                f'<img src="data:image/png;base64,{img_result["image_data"]}">'
-            )
+            html.append(f'<img src="data:image/png;base64,{img_result["image_data"]}">')
 
             # Copy elements
-            html.append(
-                "<div>"
-            )
-            html.append(
-                f"<h4>Copy Elements</h4>"
-            )
-            html.append(
-                f"<p><strong>Headline:</strong> {img_result['headline']}</p>"
-            )
-            html.append(
-                f"<p><strong>Subtext:</strong> {img_result['subtext']}</p>"
-            )
-            html.append(
-                f"<p><strong>Call to Action:</strong> {img_result['cta']}</p>"
-            )
+            html.append("<div>")
+            html.append(f"<h4>Copy Elements</h4>")
+            html.append(f"<p><strong>Headline:</strong> {img_result['headline']}</p>")
+            html.append(f"<p><strong>Subtext:</strong> {img_result['subtext']}</p>")
+            html.append(f"<p><strong>Call to Action:</strong> {img_result['cta']}</p>")
             html.append("</div>")
 
             html.append("</div>")
@@ -702,7 +674,7 @@ async def runner(inputs: dict, tracer: Tracer):
     organization="NMKR",
 )
 async def enter(request: fastapi.Request, inputs: dict):
-    return Launch(request, "app.app:runner", inputs=inputs)
+    return Launch(request, ".app:runner", inputs=inputs)
 
 
 from ray import serve

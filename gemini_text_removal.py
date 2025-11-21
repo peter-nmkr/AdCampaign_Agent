@@ -3,10 +3,7 @@ from google.genai import types
 import mimetypes
 import os
 import base64
-import dotenv
 import sys
-
-dotenv.load_dotenv()
 
 full_prompt = ()
 
