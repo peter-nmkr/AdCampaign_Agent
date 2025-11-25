@@ -1,6 +1,9 @@
 import os
 import dotenv
 import json
+import subprocess
+
+subprocess.run(["playwright", "install"])
 
 dotenv.load_dotenv()
 from kodosumi.core import ServeAPI
@@ -674,7 +677,7 @@ async def runner(inputs: dict, tracer: Tracer):
     organization="NMKR",
 )
 async def enter(request: fastapi.Request, inputs: dict):
-    return Launch(request, ".app:runner", inputs=inputs)
+    return Launch(request, "ad_campaign.app:runner", inputs=inputs)
 
 
 from ray import serve
