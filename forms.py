@@ -38,7 +38,7 @@ campaign_form_model = F.Model(
     F.InputFiles(
         name="logo",
         label="Upload Logo (PNG, JPG)",
-        required=False,
+        required=True,
         multiple=False,
         directory=False
     ),

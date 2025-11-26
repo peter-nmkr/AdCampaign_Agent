@@ -96,7 +96,6 @@ class CampaignState(TypedDict):
     budget: Optional[str]
 
     # Generated outputs
-    screenshot_base64: Optional[str]
     brand_identity: Optional[str]
     logo_base64: Optional[str]
     logo_mime: Optional[str]
@@ -220,7 +219,6 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
 
             return {
                 **state,
-                "screenshot_base64": screenshot_base64,
                 "brand_identity": brand_identity,
                 "logo_base64": logo_base64,
                 "logo_mime": logo_mime,
@@ -235,7 +233,6 @@ async def capture_and_extract_brand_node(state: CampaignState) -> CampaignState:
 
         return {
             **state,
-            "screenshot_base64": None,
             "brand_identity": None,
             "logo_base64": None,
             "logo_mime": None,
@@ -343,9 +340,9 @@ async def generate_graphic_concepts_node(state: CampaignState) -> CampaignState:
 def generate_image_gemini(
     concept: dict,
     concept_number: int,
+    tracer: Tracer,
     logo_base64: Optional[str] = None,
-    logo_mime: Optional[str] = None,
-    format_image: Optional = None,
+    logo_mime: Optional[str] = None
 ) -> Dict:
     """Generate an image using Gemini 2.5 Flash Image and overlay logo if provided"""
     try:
@@ -362,6 +359,8 @@ def generate_image_gemini(
     import os
     import time
     import io
+
+    fs = tracer.fs_sync()
 
     try:
         t0 = datetime.datetime.now()
@@ -399,18 +398,6 @@ def generate_image_gemini(
                 else:
                     contents = [full_prompt]
 
-                if format_image:
-                    contents.append(
-                        types.Part.from_text(
-                            text="Use the same format as the following image"
-                        )
-                    )
-                    contents.append(
-                        types.Part.from_bytes(
-                            data=format_image, mime_type=("image/png")
-                        )
-                    )
-
                 response = client.models.generate_content(
                     model="gemini-2.5-flash-image-preview",
                     contents=contents,
@@ -428,6 +415,20 @@ def generate_image_gemini(
 
                 if image_parts and len(image_parts[0]) > 0:
                     image_bytes = image_parts[0]
+                    # save raw image bytes to disk
+                    out_dir = os.path.join(os.getcwd(), "generated_images")
+                    os.makedirs(out_dir, exist_ok=True)
+                    filename = f"graphic_{concept_number}_{int(time.time())}.png"
+                    image_path = os.path.join(out_dir, filename)
+                    with open(image_path, "wb") as f:
+                        f.write(image_bytes)
+                    
+                    # Upload file to the flow execution
+                    fs.upload(image_path)
+                    public_path = f"/files/{tracer.fid}/out/{filename}"
+                    # Remove the local result file
+                    os.remove(image_path)
+
                     break
 
                 if attempt < max_retries - 1:
@@ -438,7 +439,7 @@ def generate_image_gemini(
                     raise
                 time.sleep(2**attempt)
 
-        if not image_bytes or len(image_bytes) < 100:
+        if not public_path:
             return {
                 "graphic_number": concept_number,
                 "target_platform": concept.get("target_platform", "Unknown"),
@@ -450,8 +451,7 @@ def generate_image_gemini(
         return {
             "graphic_number": concept_number,
             "target_platform": concept.get("target_platform", "Unknown"),
-            "image_path": None,
-            "image_data": base64.b64encode(image_bytes).decode("utf-8"),
+            "image_path": public_path,
             "headline": concept.get("copy_headline", ""),
             "subtext": concept.get("copy_subtext", ""),
             "cta": concept.get("call_to_action", ""),
@@ -501,10 +501,7 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
     # Launch parallel Ray tasks with logo
     futures = [
         generate_image_gemini.remote(
-            concept,
-            concept["graphic_number"],
-            logo_square,
-            logo_mime,
+            concept, concept["graphic_number"], tracer, logo_square, logo_mime
         )
         for concept in concept_dicts
     ]
@@ -534,9 +531,9 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
             else:
                 await tracer.markdown(f"✅ Generated in {result['runtime']:.2f}s")
                 # Display inline image using base64
-                if result.get("image_data"):
+                if result.get("image_path"):
                     await tracer.html(
-                        f'<img src="data:image/png;base64,{result["image_data"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />'
+                        f'<img src="{result["image_path"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />'
                     )
 
             await tracer.html("<hr style='margin: 20px 0;' />")
@@ -600,7 +597,6 @@ async def runner(inputs: dict, tracer: Tracer):
             "cta": inputs.get("cta"),
             "channels": inputs.get("channels"),
             "budget": inputs.get("budget"),
-            "screenshot_base64": None,
             "brand_identity": None,
             "logo_base64": None,
             "logo_mime": None,
@@ -646,7 +642,7 @@ async def runner(inputs: dict, tracer: Tracer):
             )
 
             # Display image
-            html.append(f'<img src="data:image/png;base64,{img_result["image_data"]}">')
+            html.append(f'<img src="{img_result["image_path"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />')
 
             # Copy elements
             html.append("<div>")
