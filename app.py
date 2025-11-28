@@ -382,109 +382,74 @@ def generate_image_gemini(
 
     fs = tracer.fs_sync()
 
-    try:
-        t0 = datetime.datetime.now()
+    width, height = 1, 1
+    headline = concept.get("copy_headline", "")
+    subtext = concept.get("copy_subtext", "")
+    cta = concept.get("call_to_action", "")
+    full_prompt = (
+        f"{concept['description']}; "
+        f"Headline: {headline}. Subtext: {subtext}. Call to Action: {cta}. "
+        f"{width}:{height} aspect ratio"
+    )
 
-        width, height = 1, 1
-        headline = concept.get("copy_headline", "")
-        subtext = concept.get("copy_subtext", "")
-        cta = concept.get("call_to_action", "")
-        full_prompt = (
-            f"{concept['description']}; "
-            f"Headline: {headline}. Subtext: {subtext}. Call to Action: {cta}. "
-            f"{width}:{height} aspect ratio"
-        )
+    # Initialize Gemini client
+    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
-        # Initialize Gemini client
-        client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+    # Generate image with retry logic
+    image_bytes = None
 
-        # Generate image with retry logic
-        max_retries = 3
-        image_bytes = None
+    # Build contents for Gemini; always include logo if provided
+    if logo_base64:
+        from google.genai import types
 
-        for attempt in range(max_retries):
-            try:
-                # Build contents for Gemini; always include logo if provided
-                if logo_base64:
-                    from google.genai import types
+        contents = [
+            types.Part.from_bytes(
+                data=base64.b64decode(logo_base64),
+                mime_type=(logo_mime or "image/png"),
+            ),
+            full_prompt,
+        ]
+    else:
+        contents = [full_prompt]
 
-                    contents = [
-                        types.Part.from_bytes(
-                            data=base64.b64decode(logo_base64),
-                            mime_type=(logo_mime or "image/png"),
-                        ),
-                        full_prompt,
-                    ]
-                else:
-                    contents = [full_prompt]
+    t0 = datetime.datetime.now()
 
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-image-preview",
-                    contents=contents,
-                )
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-image-preview",
+        contents=contents,
+    )
 
-                if not response or not response.candidates:
-                    raise ValueError("No candidates in response")
+    filename = f"graphic_{concept_number}_{int(time.time())}.png"
+    out_dir = os.path.join(os.getcwd(), "generated_images")
+    os.makedirs(out_dir, exist_ok=True)
+    image_path = os.path.join(out_dir, filename)
 
-                # Extract image data
-                image_parts = [
-                    part.inline_data.data
-                    for part in response.candidates[0].content.parts
-                    if part.inline_data and part.inline_data.data
-                ]
+    for part in response.parts:
+        if part.text is not None:
+            print(part.text)
+        elif part.inline_data is not None:
+            image = part.as_image()
+            image.save(image_path)
+        if not response or not response.candidates:
+            raise ValueError("No candidates in response")
 
-                if image_parts and len(image_parts[0]) > 0:
-                    image_bytes = image_parts[0]
-                    # save raw image bytes to disk
-                    out_dir = os.path.join(os.getcwd(), "generated_images")
-                    os.makedirs(out_dir, exist_ok=True)
-                    filename = f"graphic_{concept_number}_{int(time.time())}.png"
-                    image_path = os.path.join(out_dir, filename)
-                    with open(image_path, "wb") as f:
-                        f.write(image_bytes)
+    # Upload file to the flow execution
+    fs.upload(image_path)
+    public_path = f"/files/{tracer.fid}/out/{filename}"
 
-                    # Upload file to the flow execution
-                    fs.upload(image_path)
-                    public_path = f"/files/{tracer.fid}/out/{filename}"
+    runtime = datetime.datetime.now() - t0
 
-                    break
-
-                if attempt < max_retries - 1:
-                    time.sleep(2**attempt)  # Exponential backoff
-
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise
-                time.sleep(2**attempt)
-
-        if not public_path:
-            return {
-                "graphic_number": concept_number,
-                "target_platform": concept.get("target_platform", "Unknown"),
-                "error": "Failed to generate valid image data",
-            }
-
-        runtime = datetime.datetime.now() - t0
-
-        return {
-            "graphic_number": concept_number,
-            "target_platform": concept.get("target_platform", "Unknown"),
-            "image_local_path": image_path,
-            "image_path": public_path,
-            "headline": concept.get("copy_headline", ""),
-            "subtext": concept.get("copy_subtext", ""),
-            "cta": concept.get("call_to_action", ""),
-            "runtime": runtime.total_seconds(),
-            "error": None,
-        }
-
-    except Exception as e:
-        return {
-            "graphic_number": concept_number,
-            "target_platform": concept.get("target_platform", "Unknown"),
-            "error": str(e),
-            "runtime": 0,
-        }
+    return {
+        "graphic_number": concept_number,
+        "target_platform": concept.get("target_platform", "Unknown"),
+        "image_local_path": image_path,
+        "image_path": public_path,
+        "headline": concept.get("copy_headline", ""),
+        "subtext": concept.get("copy_subtext", ""),
+        "cta": concept.get("call_to_action", ""),
+        "runtime": runtime.total_seconds(),
+        "error": None,
+    }
 
 
 # Node 4: Generate Images in Parallel
@@ -621,6 +586,7 @@ async def remove_image_text_node(state: CampaignState) -> CampaignState:
                     output.append(img)
     return {**state, "generated_images": output, "tracer": tracer}
 
+
 async def package_images_node(state: CampaignState) -> CampaignState:
     tracer = state["tracer"]
     generated_images = state["generated_images"]
@@ -645,7 +611,7 @@ async def package_images_node(state: CampaignState) -> CampaignState:
 
         # Create a ZIP file
         zip_path = Path(f"campaign_images_{tracer.fid}.zip")
-        shutil.make_archive(zip_path.stem, 'zip', temp_dir)
+        shutil.make_archive(zip_path.stem, "zip", temp_dir)
         # Upload the ZIP file to the file system
         zip_path_str = str(zip_path)
         fs.upload(zip_path_str)
@@ -676,6 +642,7 @@ async def package_images_node(state: CampaignState) -> CampaignState:
     except Exception as e:
         await tracer.markdown(f"⚠️ Error packaging images: {str(e)}")
         return {**state, "tracer": tracer, "zip_pahth": public_zip_path}
+
 
 # Build the LangGraph workflow
 workflow = StateGraph(CampaignState)
