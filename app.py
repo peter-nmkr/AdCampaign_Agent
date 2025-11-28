@@ -2,6 +2,8 @@ import os
 import dotenv
 import json
 import subprocess
+import zipfile
+import shutil
 
 subprocess.run(["playwright", "install"])
 
@@ -79,6 +81,9 @@ class generatedImageResult(BaseModel):
     trget_platform: str = Field(description="Target platform")
     image_local_path: str = Field(description="Local path to the generated image")
     image_path: str = Field(description="Public path to the generated image")
+    image_text_removed_local_path: str = Field(
+        description="Local path to text-removed image"
+    )
     image_text_removed_path: Optional[str] = Field(
         description="Public path to text-removed image"
     )
@@ -117,6 +122,7 @@ class CampaignState(TypedDict):
     company_profile: str
     graphic_concepts: Optional[GraphicConceptsOutput]
     generated_images: List[generatedImageResult]
+    zip_path: Optional[str]
 
     tracer: Tracer
 
@@ -571,9 +577,7 @@ def remove_text_from_image(
 
     gemini_output_path = image_path.replace(".png", "_notext.png")
     gemini_text_removal.remove_text(image_path, gemini_output_path)
-    os.remove(image_path)  # Remove original image
     fs.upload(gemini_output_path)
-    os.remove(gemini_output_path)  # Remove local copy after upload
     public_path = f"/files/{tracer.fid}/out/{Path(gemini_output_path).name}"
     return {
         "local_path": gemini_output_path,
@@ -613,9 +617,65 @@ async def remove_image_text_node(state: CampaignState) -> CampaignState:
             for img in generated_images:
                 if img["graphic_number"] == result["graphic_number"]:
                     img["image_text_removed_path"] = result["public_path"]
+                    img["image_text_removed_local_path"] = result["local_path"]
                     output.append(img)
     return {**state, "generated_images": output, "tracer": tracer}
 
+async def package_images_node(state: CampaignState) -> CampaignState:
+    tracer = state["tracer"]
+    generated_images = state["generated_images"]
+    fs = tracer.fs_sync()
+
+    await tracer.markdown("# Step 6: Packaging Images into a ZIP File")
+
+    try:
+        # Create a temporary directory for packaging
+        temp_dir = Path(f"temp_images,_{tracer.fid}")
+        temp_dir.mkdir(exist_ok=True)
+
+        # Copy all generated images to the temporary directory
+        for img in generated_images:
+            local_path = img.get("image_local_path")
+            if local_path:
+                shutil.copy(local_path, temp_dir)
+
+            text_removed_path = img.get("image_text_removed_local_path")
+            if text_removed_path:
+                shutil.copy(text_removed_path, temp_dir)
+
+        # Create a ZIP file
+        zip_path = Path(f"campaign_images_{tracer.fid}.zip")
+        shutil.make_archive(zip_path.stem, 'zip', temp_dir)
+        # Upload the ZIP file to the file system
+        zip_path_str = str(zip_path)
+        fs.upload(zip_path_str)
+        public_zip_path = f"/files/{tracer.fid}/out/{zip_path.name}"
+
+        await tracer.markdown(f"✅ Images packaged successfully!")
+
+        # Clean up temporary directory
+        shutil.rmtree(temp_dir)
+        os.remove(zip_path_str)
+
+        # Remove original local image files now that ZIP is uploaded
+        cleanup_keys = ["image_local_path", "image_text_removed_local_path"]
+        for img in generated_images:
+            for key in cleanup_keys:
+                local_p = img.get(key)
+                if local_p:
+                    try:
+                        if os.path.exists(local_p):
+                            os.remove(local_p)
+                            await tracer.markdown(f"Removed local file: {local_p}")
+                    except Exception as e:
+                        await tracer.markdown(f"Failed to remove {local_p}: {e}")
+
+        # Update state with public ZIP path
+        return {**state, "tracer": tracer, "zip_path": public_zip_path}
+
+    except Exception as e:
+        await tracer.markdown(f"⚠️ Error packaging images: {str(e)}")
+        return {**state, "tracer": tracer, "zip_pahth": public_zip_path}
 
 # Build the LangGraph workflow
 workflow = StateGraph(CampaignState)
@@ -624,13 +684,15 @@ workflow.add_node("company_profile", generate_company_profile_node)
 workflow.add_node("graphic_concepts", generate_graphic_concepts_node)
 workflow.add_node("generate_images", generate_images_parallel_node)
 workflow.add_node("remove_text", remove_image_text_node)
+workflow.add_node("package_images", package_images_node)
 
 workflow.add_edge(START, "capture_and_extract_brand")
 workflow.add_edge("capture_and_extract_brand", "company_profile")
 workflow.add_edge("company_profile", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
 workflow.add_edge("generate_images", "remove_text")
-workflow.add_edge("remove_text", END)
+workflow.add_edge("remove_text", "package_images")
+workflow.add_edge("package_images", END)
 
 graph = workflow.compile()
 
@@ -692,6 +754,13 @@ async def runner(inputs: dict, tracer: Tracer):
     html.append("<h2>Graphics Overview</h2>")
     html.append(f"<p>{result['graphic_concepts'].campaign_overview}</p>")
     html.append("</div>")
+
+    # zip download link
+    if result.get("zip_path"):
+        html.append("<div>")
+        html.append("<h2>Download All Graphics</h2>")
+        html.append(f"<a href='{result['zip_path']}' download>Download ZIP File</a>")
+        html.append("</div>")
 
     # Generated Graphics Section
     html.append("<h2>Campaign Graphics</h2>")
