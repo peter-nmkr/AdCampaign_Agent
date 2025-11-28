@@ -1,8 +1,12 @@
 from google import genai
+from google import genai
 from google.genai import types
 import mimetypes
 import os
-import base64
+import sys
+from google.genai import types
+import mimetypes
+import os
 import sys
 
 full_prompt = ()
@@ -62,8 +66,6 @@ def remove_text(input_image_path: str, output_image_path: str):
             save_binary_file(file_name, data_buffer)
         else:
             print(chunk.text)
-
-    return True
 
 
 if __name__ == "__main__":

@@ -74,6 +74,21 @@ class GraphicConceptsOutput(BaseModel):
     concepts: List[GraphicConcept] = Field(description="List of all graphic concepts")
 
 
+class generatedImageResult(BaseModel):
+    graphic_number: int = Field(description="Graphic number")
+    trget_platform: str = Field(description="Target platform")
+    image_local_path: str = Field(description="Local path to the generated image")
+    image_path: str = Field(description="Public path to the generated image")
+    image_text_removed_path: Optional[str] = Field(
+        description="Public path to text-removed image"
+    )
+    headline: str = Field(description="Headline text")
+    subtext: str = Field(description="Subtext")
+    cta: str = Field(description="Call to action")
+    runtime: float = Field(description="Generation runtime in seconds")
+    error: Optional[str] = Field(description="Error message if any")
+
+
 # Initialize LLM
 llm = ChatOpenAI(model="gpt-4o", temperature=0.8, api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -101,8 +116,7 @@ class CampaignState(TypedDict):
     logo_mime: Optional[str]
     company_profile: str
     graphic_concepts: Optional[GraphicConceptsOutput]
-    generated_images: List[Dict]
-    image_copy_replacements: List[Dict]
+    generated_images: List[generatedImageResult]
 
     tracer: Tracer
 
@@ -342,7 +356,7 @@ def generate_image_gemini(
     concept_number: int,
     tracer: Tracer,
     logo_base64: Optional[str] = None,
-    logo_mime: Optional[str] = None
+    logo_mime: Optional[str] = None,
 ) -> Dict:
     """Generate an image using Gemini 2.5 Flash Image and overlay logo if provided"""
     try:
@@ -422,12 +436,10 @@ def generate_image_gemini(
                     image_path = os.path.join(out_dir, filename)
                     with open(image_path, "wb") as f:
                         f.write(image_bytes)
-                    
+
                     # Upload file to the flow execution
                     fs.upload(image_path)
                     public_path = f"/files/{tracer.fid}/out/{filename}"
-                    # Remove the local result file
-                    os.remove(image_path)
 
                     break
 
@@ -451,6 +463,7 @@ def generate_image_gemini(
         return {
             "graphic_number": concept_number,
             "target_platform": concept.get("target_platform", "Unknown"),
+            "image_local_path": image_path,
             "image_path": public_path,
             "headline": concept.get("copy_headline", ""),
             "subtext": concept.get("copy_subtext", ""),
@@ -548,18 +561,76 @@ async def generate_images_parallel_node(state: CampaignState) -> CampaignState:
     return {**state, "generated_images": results, "tracer": tracer}
 
 
+@ray.remote
+def remove_text_from_image(
+    image_path: str, graphic_number: int, tracer: Tracer
+) -> dict:
+    import ad_campaign.gemini_text_removal as gemini_text_removal
+
+    fs = tracer.fs_sync()
+
+    gemini_output_path = image_path.replace(".png", "_notext.png")
+    gemini_text_removal.remove_text(image_path, gemini_output_path)
+    os.remove(image_path)  # Remove original image
+    fs.upload(gemini_output_path)
+    os.remove(gemini_output_path)  # Remove local copy after upload
+    public_path = f"/files/{tracer.fid}/out/{Path(gemini_output_path).name}"
+    return {
+        "local_path": gemini_output_path,
+        "public_path": public_path,
+        "graphic_number": graphic_number,
+    }
+
+
+async def remove_image_text_node(state: CampaignState) -> CampaignState:
+    tracer = state["tracer"]
+    generated_images = state["generated_images"]
+    fs = await tracer.fs()
+
+    await tracer.markdown("# Step 5: Removing Text from Generated Images")
+
+    futures = [
+        remove_text_from_image.remote(
+            img["image_local_path"], img["graphic_number"], tracer
+        )
+        for img in generated_images
+    ]
+
+    unready = futures.copy()
+    completed = 0
+    results = []
+
+    output = []
+
+    while unready:
+        ready, unready = ray.wait(unready, num_returns=1, timeout=1)
+        if ready:
+            result = ray.get(ready[0])
+            results.append(result)
+            completed += 1
+            await tracer.markdown(f"remoed text for image {result}")
+            # merge result into generated_images where grpahic_number matches
+            for img in generated_images:
+                if img["graphic_number"] == result["graphic_number"]:
+                    img["image_text_removed_path"] = result["public_path"]
+                    output.append(img)
+    return {**state, "generated_images": output, "tracer": tracer}
+
+
 # Build the LangGraph workflow
 workflow = StateGraph(CampaignState)
 workflow.add_node("capture_and_extract_brand", capture_and_extract_brand_node)
 workflow.add_node("company_profile", generate_company_profile_node)
 workflow.add_node("graphic_concepts", generate_graphic_concepts_node)
 workflow.add_node("generate_images", generate_images_parallel_node)
+workflow.add_node("remove_text", remove_image_text_node)
 
 workflow.add_edge(START, "capture_and_extract_brand")
 workflow.add_edge("capture_and_extract_brand", "company_profile")
 workflow.add_edge("company_profile", "graphic_concepts")
 workflow.add_edge("graphic_concepts", "generate_images")
-workflow.add_edge("generate_images", END)
+workflow.add_edge("generate_images", "remove_text")
+workflow.add_edge("remove_text", END)
 
 graph = workflow.compile()
 
@@ -603,7 +674,6 @@ async def runner(inputs: dict, tracer: Tracer):
             "company_profile": "",
             "graphic_concepts": None,
             "generated_images": [],
-            "image_copy_replacements": [],
             "tracer": tracer,
         }
     )
@@ -642,7 +712,12 @@ async def runner(inputs: dict, tracer: Tracer):
             )
 
             # Display image
-            html.append(f'<img src="{img_result["image_path"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />')
+            html.append(
+                f'<img src="{img_result["image_path"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />'
+            )
+            html.append(
+                f'<img src="{img_result["image_text_removed_path"]}" style="max-width: 600px; border-radius: 8px; margin: 10px 0;" />'
+            )
 
             # Copy elements
             html.append("<div>")
